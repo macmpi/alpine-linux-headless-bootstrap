@@ -1,0 +1,124 @@
+#!/bin/sh
+
+# Redirect stdout and errors to console as rc.local does not log anything
+exec 1>/dev/console 2>&1
+
+mkdir /tmp/.trash
+ovlpath=$( find /media -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
+
+
+## Setup Network interfaces
+if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
+	logger -st ${0##*/} "Wifi setup found !"
+	apk add wpa_supplicant
+	cp "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
+	rc-service wpa_supplicant start
+else
+	logger -st ${0##*/} "Wifi setup not found !"
+fi
+
+if ! cp "${ovlpath}/interfaces" /etc/network/interfaces; then
+	# set default interfaces if not specified by interface file on boot storage
+	logger -st ${0##*/} "No interfaces file supplied, building default interfaces..."
+	for dev in $(ls /sys/class/net)
+	do
+		case ${dev%%[0-9]*} in
+			lo)
+					cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet loopback
+
+					EOF
+					;;
+			eth)
+					cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet dhcp
+						hostname localhost
+
+					EOF
+					;;
+			wlan)
+					[ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet dhcp
+						hostname localhost
+
+					EOF
+					;;
+			usb)
+					cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet static
+					    address 10.42.0.2/24
+					    gateway 10.42.0.1
+					    hostname localhost
+
+					EOF
+
+					cat <<-EOF > /etc/resolv.conf
+					nameserver 208.67.222.222
+					nameserver 208.67.220.220
+
+					EOF
+					;;
+		esac
+	done
+fi
+
+echo "Using following network interfaces:"
+cat /etc/network/interfaces
+
+rc-service networking start
+
+
+## Setup temporary SSH server (root login, no password)
+## we use some bundled keys to avoid generation at boot and save time
+## bundled temporary keys are moved in /tmp so they won't be stored
+## within permanent config later (new ones will then be generated)
+apk add openssh
+
+mv /etc/ssh/ssh_host_* /tmp/.trash/.
+
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.orig
+cat <<-EOF >> /etc/ssh/sshd_config
+	AuthenticationMethods none
+	PermitEmptyPasswords yes
+	PermitRootLogin yes
+	HostKey /tmp/.trash/ssh_host_dsa_key
+	HostKey /tmp/.trash/ssh_host_ecdsa_key
+	HostKey /tmp/.trash/ssh_host_ed25519_key
+	HostKey /tmp/.trash/ssh_host_rsa_key
+	EOF
+
+cp /etc/conf.d/sshd /etc/conf.d/sshd.orig
+cat <<-EOF >> /etc/conf.d/sshd
+	sshd_disable_keygen=yes
+	EOF
+
+rc-service sshd start
+
+if [ -f "${ovlpath}/unattended.sh" ]; then
+	install -m755 "${ovlpath}/unattended.sh" /tmp/unattended.sh
+	/tmp/unattended.sh >/dev/console 2>&1 &
+	logger -st ${0##*/} "/tmp/unattended.sh script launched in the background with PID $!"
+fi
+
+
+## Prep for final post-cleanup
+cat <<-EOF > /tmp/.trash/post-cleanup
+	#!/bin/sh
+	logger -st ${0##*/} "Cleaning-up..."
+	mv /etc/ssh/sshd_config.orig /etc/ssh/sshd_config
+	mv /etc/conf.d/sshd.orig /etc/conf.d/sshd
+	rm /etc/modules-load.d/g_ether.conf
+	rm /etc/modprobe.d/g_ether.conf
+	rc-update del local default
+	rm /etc/local.d/headless.start
+
+	logger -st ${0##*/} "Done !!"
+	EOF
+
+chmod +x /tmp/.trash/post-cleanup
+exec /tmp/.trash/post-cleanup
+
