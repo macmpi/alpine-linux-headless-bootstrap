@@ -34,7 +34,6 @@ if ! cp "${ovlpath}/interfaces" /etc/network/interfaces; then
 					cat <<-EOF >> /etc/network/interfaces
 					auto $dev
 					iface $dev inet dhcp
-						hostname localhost
 
 					EOF
 					;;
@@ -42,7 +41,6 @@ if ! cp "${ovlpath}/interfaces" /etc/network/interfaces; then
 					[ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && cat <<-EOF >> /etc/network/interfaces
 					auto $dev
 					iface $dev inet dhcp
-						hostname localhost
 
 					EOF
 					;;
@@ -52,7 +50,6 @@ if ! cp "${ovlpath}/interfaces" /etc/network/interfaces; then
 					iface $dev inet static
 					    address 10.42.0.2/24
 					    gateway 10.42.0.1
-					    hostname localhost
 
 					EOF
 
@@ -69,6 +66,8 @@ fi
 echo "Using following network interfaces:"
 cat /etc/network/interfaces
 
+echo "alpine-headless" > /etc/hostname
+hostname -F /etc/hostname
 rc-service networking start
 
 
