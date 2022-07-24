@@ -97,13 +97,6 @@ cat <<-EOF >> /etc/conf.d/sshd
 
 rc-service sshd start
 
-if [ -f "${ovlpath}/unattended.sh" ]; then
-	install -m755 "${ovlpath}/unattended.sh" /tmp/unattended.sh
-	/tmp/unattended.sh >/dev/console 2>&1 &
-	logger -st ${0##*/} "/tmp/unattended.sh script launched in the background with PID $!"
-fi
-
-
 ## Prep for final post-cleanup
 cat <<-EOF > /tmp/.trash/post-cleanup
 	#!/bin/sh
@@ -114,6 +107,12 @@ cat <<-EOF > /tmp/.trash/post-cleanup
 	rm /etc/modprobe.d/g_ether.conf
 	rc-update del local default
 	rm /etc/local.d/headless.start
+
+	if [ -f "${ovlpath}/unattended.sh" ]; then
+		install -m755 "${ovlpath}/unattended.sh" /tmp/unattended.sh
+		/tmp/unattended.sh >/dev/console 2>&1 &
+		logger -st ${0##*/} "/tmp/unattended.sh script launched in the background with PID \$!"
+	fi
 
 	logger -st ${0##*/} "Done !!"
 	EOF
