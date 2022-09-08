@@ -10,7 +10,7 @@ This repo provides an overaly file to initially boot the headless system (levera
 Please follow [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation#Installation_Overview) to download & create installation media for the chosen platform.\
 Tools provided here can be used on any plaform for any install modes (diskless, data disk, system disk).
 
-Just add [**headless.apkovl.tar.gz**](https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz) overlay file at the root of Alpine Linux boot media (or onto any writeable side-media) and boot the system.
+Just add [**headless.apkovl.tar.gz**](https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz) overlay file at the root of Alpine Linux boot media (or onto any writeable side-media, e.g. the secondary partition of x86_64 ISO containing EFI files) and boot the system.
 
 With default network interface definitions (and optional wifi SSID/pass file), one may then access the system under `ssh` with:\
 `ssh root@<IP>`  (system IP address may be determined with any IP scanning tools such as `nmap`).
