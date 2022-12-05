@@ -12,7 +12,6 @@ if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
 	logger -st ${0##*/} "Wifi setup found !"
 	apk add wpa_supplicant
 	cp "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
-	rc-service wpa_supplicant start
 else
 	logger -st ${0##*/} "Wifi setup not found !"
 fi
@@ -68,6 +67,8 @@ cat /etc/network/interfaces
 
 echo "alpine-headless" > /etc/hostname
 hostname -F /etc/hostname
+
+grep -q "wlan" /etc/network/interfaces && [ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && rc-service wpa_supplicant start
 rc-service networking start
 
 
