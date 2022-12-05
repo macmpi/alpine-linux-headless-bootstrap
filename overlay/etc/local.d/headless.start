@@ -1,7 +1,11 @@
 #!/bin/sh
 
+VERSION="0.5"
+
 # Redirect stdout and errors to console as rc.local does not log anything
 exec 1>/dev/console 2>&1
+
+logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 
 mkdir /tmp/.trash
 ovlpath=$( find /media -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
@@ -12,7 +16,6 @@ if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
 	logger -st ${0##*/} "Wifi setup found !"
 	apk add wpa_supplicant
 	cp "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
-	rc-service wpa_supplicant start
 else
 	logger -st ${0##*/} "Wifi setup not found !"
 fi
@@ -68,6 +71,8 @@ cat /etc/network/interfaces
 
 echo "alpine-headless" > /etc/hostname
 hostname -F /etc/hostname
+
+grep -q "wlan" /etc/network/interfaces && [ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && rc-service wpa_supplicant start
 rc-service networking start
 
 
@@ -84,8 +89,6 @@ cat <<-EOF >> /etc/ssh/sshd_config
 	AuthenticationMethods none
 	PermitEmptyPasswords yes
 	PermitRootLogin yes
-	HostKey /tmp/.trash/ssh_host_dsa_key
-	HostKey /tmp/.trash/ssh_host_ecdsa_key
 	HostKey /tmp/.trash/ssh_host_ed25519_key
 	HostKey /tmp/.trash/ssh_host_rsa_key
 	EOF
