@@ -85,8 +85,6 @@ cat <<-EOF >> /etc/ssh/sshd_config
 	AuthenticationMethods none
 	PermitEmptyPasswords yes
 	PermitRootLogin yes
-	HostKey /tmp/.trash/ssh_host_dsa_key
-	HostKey /tmp/.trash/ssh_host_ecdsa_key
 	HostKey /tmp/.trash/ssh_host_ed25519_key
 	HostKey /tmp/.trash/ssh_host_rsa_key
 	EOF
