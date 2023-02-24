@@ -101,11 +101,17 @@ cat <<-EOF >> /etc/conf.d/sshd
 rc-service sshd start
 
 ## Prep for final post-cleanup
+## clears any installed packages and settings
 cat <<-EOF > /tmp/.trash/post-cleanup
 	#!/bin/sh
 	logger -st ${0##*/} "Cleaning-up..."
 	mv /etc/ssh/sshd_config.orig /etc/ssh/sshd_config
 	mv /etc/conf.d/sshd.orig /etc/conf.d/sshd
+	apk del openssh
+	apk del wpa_supplicant
+	rm -rf /etc/wpa_supplicant
+	rm /etc/network/interfaces
+	rm /etc/hostname
 	rm /etc/modules-load.d/g_ether.conf
 	rm /etc/modprobe.d/g_ether.conf
 	rc-update del local default
