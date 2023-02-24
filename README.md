@@ -12,8 +12,8 @@ Tools provided here can be used on any plaform for any install modes (diskless, 
 
 Just add [**headless.apkovl.tar.gz**](https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz) overlay file at the root of Alpine Linux boot media (or onto any custom side-media) and boot the system.
 
-With default network interface definitions (and SSID/pass file if using wifi), one may then access the system under `ssh` with:\
-`ssh root@<IP>`  (system IP address may be determined with any IP scanning tools such as `nmap`).
+With default network interface definitions (and SSID/pass file if using wifi), one may then access the system under `ssh` with: `ssh root@<IP>`\
+(system IP address may be determined with any IP scanning tools such as `nmap`).
 
 As with Alpine Linux initial bring-up, `root` account has no password initially (change that after setup!).\
 From there, system install can be fine-tuned as usual with `setup-alpine` for instance (check [wiki](https://wiki.alpinelinux.org/wiki/Alpine_setup_scripts#setup-alpine) for details).
