@@ -1,13 +1,13 @@
 # Deploy Alpine Linux on a headless system
 
-[Alpine Linux documentation](https://docs.alpinelinux.org/user-handbook/0.1a/Installing/setup_alpine.html) assumes one can interract with system directly with a keyboard & display.\
+[Alpine Linux documentation](https://docs.alpinelinux.org/user-handbook/0.1a/Installing/setup_alpine.html) assumes **initial setup** is carried-out on a system with a keyboard & display to interract with.\
 However, there are many cases where one might want to deploy a headless system, only available through a network connection (ethernet, wifi or as USB ethernet gadget).
 
-This repo provides an **overlay file** to initially boot the headless system (leveraging Alpine distro's `initramfs` feature): it enables a basic ssh server to log-into from another Computer, in order to finalize system set-up.
+This repo provides an **overlay file** to initially boot such headless system (leveraging Alpine distro's `initramfs` feature): it enables a basic ssh server to log-into from another Computer, in order to finalize system set-up.
 
 
 ## Install procedure:
-Please follow [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation#Installation_Overview) to download & create installation media for the chosen platform.\
+Please follow [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation#Installation_Overview) to download & create installation media for the target platform.\
 Tools provided here can be used on any plaform for any install modes (diskless, data disk, system disk).
 
 Just add [**headless.apkovl.tar.gz**](https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz) overlay file at the root of Alpine Linux boot media (or onto any custom side-media) and boot the system.
@@ -40,5 +40,5 @@ Execute `./make.sh` to rebuild `headless.apkovl.tar.gz` after changes.
 
 
 ## Credits
-Thanks for the original instructions & scripts from @sodface and @davidmytton.
+Thanks for the initial guides & scripts from @sodface and @davidmytton.
 
