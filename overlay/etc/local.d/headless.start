@@ -80,6 +80,13 @@ rc-service networking start
 ## we use some bundled or optionaly provided keys to avoid generation at boot and save time
 apk add openssh
 
+# banner file
+cat <<-EOF > /tmp/.trash/banner
+
+	Alpine Linux headless bootstrap v$VERSION by macmpi
+
+	EOF
+
 # bundled temporary keys are moved in RAM /tmp so they won't be stored
 # within permanent config later (new ones will then be generated)
 mv /etc/ssh/ssh_host_*_key* /tmp/.trash/.
@@ -89,6 +96,7 @@ cat <<-EOF >> /etc/ssh/sshd_config
 	AuthenticationMethods none
 	PermitEmptyPasswords yes
 	PermitRootLogin yes
+	Banner /tmp/.trash/banner
 	EOF
 
 # inject optional custom keys (those might be stored)
