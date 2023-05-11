@@ -15,12 +15,12 @@ ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name 
 if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
 	logger -st ${0##*/} "Wifi setup found !"
 	apk add wpa_supplicant
-	cp "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
+	install -m600 "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
 else
 	logger -st ${0##*/} "Wifi setup not found !"
 fi
 
-if ! cp "${ovlpath}/interfaces" /etc/network/interfaces; then
+if ! install -m644 "${ovlpath}/interfaces" /etc/network/interfaces; then
 	# set default interfaces if not specified by interface file on boot storage
 	logger -st ${0##*/} "No interfaces file supplied, building default interfaces..."
 	for dev in $(ls /sys/class/net)
@@ -77,21 +77,25 @@ rc-service networking start
 
 
 ## Setup temporary SSH server (root login, no password)
-## we use some bundled keys to avoid generation at boot and save time
-## bundled temporary keys are moved in /tmp so they won't be stored
-## within permanent config later (new ones will then be generated)
+## we use some bundled or optionaly provided keys to avoid generation at boot and save time
 apk add openssh
 
-mv /etc/ssh/ssh_host_* /tmp/.trash/.
+# bundled temporary keys are moved in RAM /tmp so they won't be stored
+# within permanent config later (new ones will then be generated)
+mv /etc/ssh/ssh_host_*_key* /tmp/.trash/.
 
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.orig
 cat <<-EOF >> /etc/ssh/sshd_config
 	AuthenticationMethods none
 	PermitEmptyPasswords yes
 	PermitRootLogin yes
-	HostKey /tmp/.trash/ssh_host_ed25519_key
-	HostKey /tmp/.trash/ssh_host_rsa_key
 	EOF
+
+# inject optional custom keys (those might be stored)
+if ! install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/; then
+	echo "HostKey /tmp/.trash/ssh_host_ed25519_key" >> /etc/ssh/sshd_config
+	echo "HostKey /tmp/.trash/ssh_host_rsa_key" >> /etc/ssh/sshd_config
+fi
 
 cp /etc/conf.d/sshd /etc/conf.d/sshd.orig
 cat <<-EOF >> /etc/conf.d/sshd

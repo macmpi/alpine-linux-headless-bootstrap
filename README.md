@@ -22,6 +22,7 @@ From there, system install can be fine-tuned as usual with `setup-alpine` for in
 Add-on files may be added next to `headless.apkovl.tar.gz` to customise setup (sample files are provided):
 - `wpa_supplicant.conf` (*mandatory for wifi usecase*): define wifi SSID & password.
 - `interfaces` (*optional*): define network interfaces at will, if defaults DCHP-based are not suitable.
+- `ssh_host_*_key*` (*optional*): provide custom ssh keys to be injected (can be stored), instead of bundled ones[^1] (not stored).
 - `unattended.sh` (*optional*): make custom automated deployment script to further tune & extend setup (backgrounded).
 
 *Note:* these files are linux text files: Windows/macOS users need to use text editors supporting linux text line-ending (such as [notepad++](https://notepad-plus-plus.org/), BBEdit or any other).
@@ -32,7 +33,7 @@ With Computer set-up to share networking with USB interface as 10.42.0.1 gateway
 
 Main execution steps are logged in `/var/log/messages`.
 
-[^1]: About bundled ssh keys: as this package is essentially intended to **quickly bootstrap** system in order to configure it, it purposely embeds [some ssh keys](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/etc/ssh) so that bootstrapping is as fast as possible. Those (temporary) keys are moved in /tmp, so they will **not be saved/reused** once permanent configuration is set (with or without ssh server voluntarily installed in permanent setup).
+[^1]: About bundled ssh keys: as this package is essentially intended to **quickly bootstrap** system in order to configure it, it purposely embeds [some ssh keys](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/etc/ssh) so that bootstrapping is as fast as possible. Those (temporary) keys are moved in RAM /tmp, so they will **not be saved/reused** once permanent configuration is set (with or without ssh server voluntarily installed in permanent setup).
 
 
 ## How to customize further ?
