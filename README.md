@@ -1,16 +1,16 @@
 # Deploy Alpine Linux on a headless system
 
-[Alpine Linux documentation](https://docs.alpinelinux.org/user-handbook/0.1a/Installing/setup_alpine.html) assumes one can interract with system directly with a keyboard & display.\
+[Alpine Linux documentation](https://docs.alpinelinux.org/user-handbook/0.1a/Installing/setup_alpine.html) assumes **initial setup** is carried-out on a system with a keyboard & display to interract with.\
 However, there are many cases where one might want to deploy a headless system, only available through a network connection (ethernet, wifi or as USB ethernet gadget).
 
-This repo provides an **overlay file** to initially boot the headless system (leveraging Alpine distro's `initramfs` feature): it enables a basic ssh server to log-into from another Computer, in order to finalize system set-up.
+This repo provides an **overlay file** to initially boot such headless system (leveraging Alpine distro's `initramfs` feature): it enables a basic ssh server to log-into from another Computer, in order to finalize system setup.
 
 
 ## Install procedure:
-Please follow [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation#Installation_Overview) to download & create installation media for the chosen platform.\
+Please follow [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation#Installation_Overview) to download & create installation media for the target platform.\
 Tools provided here can be used on any plaform for any install modes (diskless, data disk, system disk).
 
-Just add [**headless.apkovl.tar.gz**](https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz) overlay file at the root of Alpine Linux boot media (or onto any custom side-media) and boot the system.
+Just add [**headless.apkovl.tar.gz**](https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz)[^1] overlay file at the root of Alpine Linux boot media (or onto any custom side-media) and boot the system.
 
 With default network interface definitions (and SSID/pass file if using wifi), one may then access the system under `ssh` with: `ssh root@<IP>`\
 (system IP address may be determined with any IP scanning tools such as `nmap`).
@@ -32,6 +32,8 @@ With Computer set-up to share networking with USB interface as 10.42.0.1 gateway
 
 Main execution steps are logged in `/var/log/messages`.
 
+[^1]: About bundled ssh keys: as this package is essentially intended to **quickly bootstrap** system in order to configure it, it purposely embeds [some ssh keys](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/etc/ssh) so that bootstrapping is as fast as possible. Those (temporary) keys are moved in /tmp, so they will **not be saved/reused** once permanent configuration is set (with or without ssh server voluntarily installed in permanent setup).
+
 
 ## How to customize further ?
 This repository may be forked/cloned/downloaded.\
@@ -40,5 +42,5 @@ Execute `./make.sh` to rebuild `headless.apkovl.tar.gz` after changes.
 
 
 ## Credits
-Thanks for the original instructions & scripts from @sodface and @davidmytton.
+Thanks for the initial guides & scripts from @sodface and @davidmytton.
 
