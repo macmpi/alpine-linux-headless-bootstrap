@@ -8,7 +8,7 @@ exec 1>/dev/console 2>&1
 logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 
 mkdir /tmp/.trash
-ovlpath=$( find /media -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
+ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
 
 
 ## Setup Network interfaces
