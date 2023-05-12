@@ -10,6 +10,8 @@ logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 mkdir /tmp/.trash
 ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
 
+# Help randomess for wpa_supplicant and ssh server
+rc-service seedrng start
 
 ## Setup Network interfaces
 if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
