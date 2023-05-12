@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Copyright 2022 - 2023, macmpi
+# SPDX-License-Identifier: MIT
+
 VERSION="0.6"
 
 # Redirect stdout and errors to console as rc.local does not log anything

@@ -1,5 +1,8 @@
 #/bin/sh
 
+# Copyright 2022 - 2023, macmpi
+# SPDX-License-Identifier: MIT
+
 ## collection of few code snippets as sample unnatteded actions some may find usefull
 
 

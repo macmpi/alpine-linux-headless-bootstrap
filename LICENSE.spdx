@@ -1,0 +1,7 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+PackageName: alpine-linux-headless-bootstrap
+PackageOriginator: macmpi
+PackageHomePage: https://github.com/macmpi/alpine-linux-headless-bootstrap
+PackageLicenseDeclared: MIT
+
