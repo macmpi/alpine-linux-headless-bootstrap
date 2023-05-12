@@ -79,6 +79,19 @@ rc-service networking start
 ## Setup temporary SSH server (root login, no password)
 ## we use some bundled or optionaly provided keys to avoid generation at boot and save time
 apk add openssh
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.orig
+cp /etc/conf.d/sshd /etc/conf.d/sshd.orig
+
+cat <<-EOF >> /etc/ssh/sshd_config
+	AuthenticationMethods none
+	PermitEmptyPasswords yes
+	PermitRootLogin yes
+	Banner /tmp/.trash/banner
+	EOF
+
+cat <<-EOF >> /etc/conf.d/sshd
+	sshd_disable_keygen=yes
+	EOF
 
 # banner file
 cat <<-EOF > /tmp/.trash/banner
@@ -90,25 +103,14 @@ cat <<-EOF > /tmp/.trash/banner
 # bundled temporary keys are moved in RAM /tmp so they won't be stored
 # within permanent config later (new ones will then be generated)
 mv /etc/ssh/ssh_host_*_key* /tmp/.trash/.
-
-cp /etc/ssh/sshd_config /etc/ssh/sshd_config.orig
-cat <<-EOF >> /etc/ssh/sshd_config
-	AuthenticationMethods none
-	PermitEmptyPasswords yes
-	PermitRootLogin yes
-	Banner /tmp/.trash/banner
-	EOF
-
 # inject optional custom keys (those might be stored)
 if ! install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/; then
-	echo "HostKey /tmp/.trash/ssh_host_ed25519_key" >> /etc/ssh/sshd_config
-	echo "HostKey /tmp/.trash/ssh_host_rsa_key" >> /etc/ssh/sshd_config
+	logger -st ${0##*/} "Using bundled ssh keys from RAM..."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		HostKey /tmp/.trash/ssh_host_ed25519_key
+		HostKey /tmp/.trash/ssh_host_rsa_key
+		EOF
 fi
-
-cp /etc/conf.d/sshd /etc/conf.d/sshd.orig
-cat <<-EOF >> /etc/conf.d/sshd
-	sshd_disable_keygen=yes
-	EOF
 
 rc-service sshd start
 
