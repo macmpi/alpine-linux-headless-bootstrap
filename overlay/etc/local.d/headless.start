@@ -1,6 +1,9 @@
 #!/bin/sh
 
-VERSION="0.6"
+# Copyright 2022 - 2023, macmpi
+# SPDX-License-Identifier: MIT
+
+VERSION="0.7"
 
 # Redirect stdout and errors to console as rc.local does not log anything
 exec 1>/dev/console 2>&1
@@ -8,19 +11,21 @@ exec 1>/dev/console 2>&1
 logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 
 mkdir /tmp/.trash
-ovlpath=$( find /media -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
+ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
 
+# Help randomess for wpa_supplicant and ssh server
+rc-service seedrng start
 
 ## Setup Network interfaces
 if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
 	logger -st ${0##*/} "Wifi setup found !"
 	apk add wpa_supplicant
-	cp "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
+	install -m600 "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
 else
 	logger -st ${0##*/} "Wifi setup not found !"
 fi
 
-if ! cp "${ovlpath}/interfaces" /etc/network/interfaces; then
+if ! install -m644 "${ovlpath}/interfaces" /etc/network/interfaces; then
 	# set default interfaces if not specified by interface file on boot storage
 	logger -st ${0##*/} "No interfaces file supplied, building default interfaces..."
 	for dev in $(ls /sys/class/net)
@@ -77,27 +82,50 @@ rc-service networking start
 
 
 ## Setup temporary SSH server (root login, no password)
-## we use some bundled keys to avoid generation at boot and save time
-## bundled temporary keys are moved in /tmp so they won't be stored
-## within permanent config later (new ones will then be generated)
+## we use some bundled or optionaly provided keys to avoid generation at startup and save time
 apk add openssh
-
-mv /etc/ssh/ssh_host_* /tmp/.trash/.
-
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.orig
+cp /etc/conf.d/sshd /etc/conf.d/sshd.orig
+
 cat <<-EOF >> /etc/ssh/sshd_config
 	AuthenticationMethods none
 	PermitEmptyPasswords yes
 	PermitRootLogin yes
-	HostKey /tmp/.trash/ssh_host_ed25519_key
-	HostKey /tmp/.trash/ssh_host_rsa_key
+	Banner /tmp/.trash/banner
 	EOF
 
-cp /etc/conf.d/sshd /etc/conf.d/sshd.orig
-cat <<-EOF >> /etc/conf.d/sshd
-	sshd_disable_keygen=yes
+# Banner file
+cat <<-EOF > /tmp/.trash/banner
+
+	Alpine Linux headless bootstrap v$VERSION by macmpi
+
 	EOF
 
+# Bundled temporary keys are moved in RAM /tmp so they won't be stored
+# within permanent config later (new ones will then be generated)
+KEYGEN_STANCE="sshd_disable_keygen=yes"
+mv /etc/ssh/ssh_host_*_key* /tmp/.trash/.
+
+# Inject optional custom keys (those might be stored)
+if install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/; then
+	# check for empty key within injected ones: generate new keys if found
+	if find /etc/ssh/ -maxdepth 1 -type f -name 'ssh_host_*_key*' -empty | grep -q .; then
+		rm /etc/ssh/ssh_host_*_key*
+		KEYGEN_STANCE=""
+		logger -st ${0##*/} "Will generate new SSH keys..."
+	else
+		chmod 644 /etc/ssh/ssh_host_*_key.pub
+		logger -st ${0##*/} "Using injected SSH keys..."
+	fi
+else
+	logger -st ${0##*/} "Using bundled ssh keys from RAM..."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		HostKey /tmp/.trash/ssh_host_ed25519_key
+		HostKey /tmp/.trash/ssh_host_rsa_key
+		EOF
+fi
+
+echo "$KEYGEN_STANCE" >> /etc/conf.d/sshd
 rc-service sshd start
 
 ## Prep for final post-cleanup
