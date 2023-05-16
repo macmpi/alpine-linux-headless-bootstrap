@@ -14,12 +14,13 @@ sleep 60
 
 
 ## This snippet removes apkovl file on volume after initial boot
-ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
+ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
+ovlpath="$( dirname "$ovl" )"
 
 # also works in case volume is mounted read-only
 grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; RO=$?
 [ "$RO" -eq "0" ] && mount -o remount,rw "${ovlpath}"
-rm "${ovlpath}"/*.apkovl.tar.gz
+rm -f "${ovl}"
 [ "$RO" -eq "0" ] && mount -o remount,ro "${ovlpath}"
 
 ########################################################

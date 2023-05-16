@@ -11,9 +11,12 @@ exec 1>/dev/console 2>&1
 logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 
 mkdir /tmp/.trash
-ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
 
-# Help randomess for wpa_supplicant and ssh server
+# grab used ovl filename from dmesg
+ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
+ovlpath="$( dirname "$ovl" )"
+
+# Help randomness for wpa_supplicant and ssh server
 rc-service seedrng start
 
 ## Setup Network interfaces
@@ -95,9 +98,17 @@ cat <<-EOF >> /etc/ssh/sshd_config
 	EOF
 
 # Banner file
+warn=""
+grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; RO=$?
+[ "$RO" -eq "0" ] && warn="(remount partition read-write!)"
+
 cat <<-EOF > /tmp/.trash/banner
 
 	Alpine Linux headless bootstrap v$VERSION by macmpi
+
+You may want to delete/rename overlay before next reboot ${warn}:
+$ovl
+(can be done automatically with unattended script - see sample snippet)
 
 	EOF
 
