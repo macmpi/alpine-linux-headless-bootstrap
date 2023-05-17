@@ -3,7 +3,44 @@
 # Copyright 2022 - 2023, macmpi
 # SPDX-License-Identifier: MIT
 
-VERSION="0.7"
+VERSION="0.8"
+
+
+_apk() {
+	local cmd="$1"
+	local pkg="$2"
+
+	case $cmd in
+		add) # install only if not already present
+			if ! apk info | grep -wq "${pkg}"; then
+				apk add "$pkg" && printf "${pkg} " >> /tmp/.trash/installed
+			fi
+		;;
+		del) # delete only if previously installed
+			if grep -wq "$pkg" /tmp/.trash/installed; then
+				apk del "$pkg" && sed -i 's/\b'"${pkg}"'\b//' /tmp/.trash/installed
+			fi
+		;;
+		*)
+			echo "only add/del: wrong usage"; exit
+		;;
+	esac
+}
+
+_preserve() {
+	[ -f "$1" ] && cp "$1" "${1}.orig"
+}
+
+_restore() {
+	if [ -f "${1}.orig" ]; then
+		mv -- "${1}.orig" "${1}"
+	else
+		rm -rf "${1}"
+	fi
+}
+
+##### End of part to be dupplicated into post-cleanup (do not alter!)
+
 
 # Redirect stdout and errors to console as rc.local does not log anything
 exec 1>/dev/console 2>&1
@@ -11,20 +48,25 @@ exec 1>/dev/console 2>&1
 logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 
 mkdir /tmp/.trash
-ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name *.apkovl.tar.gz -exec dirname {} \; | head -1 )
 
-# Help randomess for wpa_supplicant and ssh server
+# grab used ovl filename from dmesg
+ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
+ovlpath="$( dirname "$ovl" )"
+
+# Help randomness for wpa_supplicant and ssh server
 rc-service seedrng start
 
 ## Setup Network interfaces
 if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
 	logger -st ${0##*/} "Wifi setup found !"
-	apk add wpa_supplicant
+	_apk add wpa_supplicant
+	_preserve "/etc/wpa_supplicant/wpa_supplicant.conf"
 	install -m600 "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
 else
 	logger -st ${0##*/} "Wifi setup not found !"
 fi
 
+_preserve "/etc/network/interfaces"
 if ! install -m644 "${ovlpath}/interfaces" /etc/network/interfaces; then
 	# set default interfaces if not specified by interface file on boot storage
 	logger -st ${0##*/} "No interfaces file supplied, building default interfaces..."
@@ -74,18 +116,21 @@ fi
 echo "Using following network interfaces:"
 cat /etc/network/interfaces
 
+_preserve "/etc/hostname"
 echo "alpine-headless" > /etc/hostname
 hostname -F /etc/hostname
 
-grep -q "wlan" /etc/network/interfaces && [ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && rc-service wpa_supplicant start
+grep -q "wlan" /etc/network/interfaces && \
+	[ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && \
+		rc-service wpa_supplicant start
 rc-service networking start
 
 
 ## Setup temporary SSH server (root login, no password)
-## we use some bundled or optionaly provided keys to avoid generation at startup and save time
-apk add openssh
-cp /etc/ssh/sshd_config /etc/ssh/sshd_config.orig
-cp /etc/conf.d/sshd /etc/conf.d/sshd.orig
+## We use some bundled (or optionaly provided) keys to avoid generation at startup and save time
+_apk add openssh
+_preserve "/etc/ssh/sshd_config"
+_preserve "/etc/conf.d/sshd"
 
 cat <<-EOF >> /etc/ssh/sshd_config
 	AuthenticationMethods none
@@ -95,20 +140,29 @@ cat <<-EOF >> /etc/ssh/sshd_config
 	EOF
 
 # Banner file
+warn=""
+grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; RO=$?
+[ "$RO" -eq "0" ] && warn="(remount partition rw!)"
+
 cat <<-EOF > /tmp/.trash/banner
 
 	Alpine Linux headless bootstrap v$VERSION by macmpi
 
+You may want to delete/rename .apkovl file before reboot ${warn}:
+$ovl
+(can be done automatically with unattended script - see sample snippet)
+
+
 	EOF
 
 # Bundled temporary keys are moved in RAM /tmp so they won't be stored
-# within permanent config later (new ones will then be generated)
+# within permanent config later (new ones will then be generated at reboot)
 KEYGEN_STANCE="sshd_disable_keygen=yes"
 mv /etc/ssh/ssh_host_*_key* /tmp/.trash/.
 
 # Inject optional custom keys (those might be stored)
 if install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/; then
-	# check for empty key within injected ones: generate new keys if found
+	# check for empty key within injected ones: if found, generate new keys
 	if find /etc/ssh/ -maxdepth 1 -type f -name 'ssh_host_*_key*' -empty | grep -q .; then
 		rm /etc/ssh/ssh_host_*_key*
 		KEYGEN_STANCE=""
@@ -130,16 +184,19 @@ rc-service sshd start
 
 ## Prep for final post-cleanup
 ## clears any installed packages and settings
-cat <<-EOF > /tmp/.trash/post-cleanup
-	#!/bin/sh
+# copy begininng of this file to keep functions
+sed -n '/^#* End .*alter!)$/q;p' /etc/local.d/headless.start > /tmp/.trash/post-cleanup
+
+cat <<-EOF >> /tmp/.trash/post-cleanup
+
 	logger -st ${0##*/} "Cleaning-up..."
-	mv /etc/ssh/sshd_config.orig /etc/ssh/sshd_config
-	mv /etc/conf.d/sshd.orig /etc/conf.d/sshd
-	apk del openssh
-	apk del wpa_supplicant
-	rm -rf /etc/wpa_supplicant
-	rm /etc/network/interfaces
-	rm /etc/hostname
+	_restore "/etc/ssh/sshd_config"
+	_restore "/etc/conf.d/sshd"
+	_apk del openssh
+	_restore "/etc/wpa_supplicant/wpa_supplicant.conf"
+	_apk del wpa_supplicant
+	_restore "/etc/network/interfaces"
+	_restore "/etc/hostname"
 	rm /etc/modules-load.d/g_ether.conf
 	rm /etc/modprobe.d/g_ether.conf
 	rc-update del local default
