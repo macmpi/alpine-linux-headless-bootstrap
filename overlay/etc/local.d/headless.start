@@ -39,7 +39,7 @@ _restore() {
 	fi
 }
 
-##### End of part to be dupplicated into post-cleanup (do not alter!)
+##### End of part to be duplicated into post-cleanup (do not alter!)
 
 
 # Redirect stdout and errors to console as rc.local does not log anything
