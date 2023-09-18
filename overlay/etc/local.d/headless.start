@@ -39,7 +39,7 @@ _restore() {
 	fi
 }
 
-##### End of part to be dupplicated into post-cleanup (do not alter!)
+##### End of part to be duplicated into post-cleanup (do not alter!)
 
 
 # Redirect stdout and errors to console as rc.local does not log anything
@@ -189,6 +189,16 @@ sed -n '/^#* End .*alter!)$/q;p' /etc/local.d/headless.start > /tmp/.trash/post-
 
 cat <<-EOF >> /tmp/.trash/post-cleanup
 
+	_tst_inet() {
+		## Tested URL redirects to github project page: is.gd shortener provides basic analytics.
+		## Analytics are public and can be checked at https://is.gd/stats.php?url=apkovl_run
+		## Privacy policy: https://is.gd/privacy.php
+		INET="failed"
+		wget -q -T 10 --spider https://is.gd/apkovl_run > /dev/null 2>&1 &&
+			INET="success"
+		logger -st ${0##*/} "Internet access: \$INET"
+	}
+
 	logger -st ${0##*/} "Cleaning-up..."
 	_restore "/etc/ssh/sshd_config"
 	_restore "/etc/conf.d/sshd"
@@ -202,6 +212,11 @@ cat <<-EOF >> /tmp/.trash/post-cleanup
 	rc-update del local default
 	rm /etc/local.d/headless.start
 
+	# Internet connectivity test
+	# Can be skipped by creating a 'opt-out'-named dummy file aside apkovl file
+	[ -f "${ovlpath}/opt-out" ] || _tst_inet &
+
+	# Run unattended script if available
 	if [ -f "${ovlpath}/unattended.sh" ]; then
 		install -m755 "${ovlpath}/unattended.sh" /tmp/unattended.sh
 		/tmp/unattended.sh >/dev/console 2>&1 &
