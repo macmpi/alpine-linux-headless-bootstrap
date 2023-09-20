@@ -22,7 +22,8 @@ From there, actual system install can be performed as usual with `setup-alpine` 
 Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapping configuration (check sample files):
 - `wpa_supplicant.conf`[^3] (*mandatory for wifi usecase*): define wifi SSID & password.
 - `interfaces`[^3] (*optional*): define network interfaces at will, if defaults DCHP-based are not suitable.
-- `ssh_host_*_key*` (*optional*): provide custom ssh keys to be injected (may be stored), instead of using bundled ones[^2] (not stored). Providing an empty key file will trigger new keys generation (ssh server may take longer to start).
+- `authorized_keys` (*optional*): provide client's public SSH key to secure `root` ssh login.
+- `ssh_host_*_key*` (*optional*): provide server's custom ssh keys to be injected (may be stored), instead of using bundled ones[^2] (not stored). Providing an empty key file will trigger new keys generation (ssh server may take longer to start).
 - `unattended.sh`[^3] (*optional*): create custom automated deployment script to further tune & extend actual setup (backgrounded).
 
 

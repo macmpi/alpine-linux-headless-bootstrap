@@ -3,7 +3,7 @@
 # Copyright 2022 - 2023, macmpi
 # SPDX-License-Identifier: MIT
 
-VERSION="0.8"
+VERSION="0.9"
 
 
 _apk() {
@@ -39,7 +39,7 @@ _restore() {
 	fi
 }
 
-##### End of part to be dupplicated into post-cleanup (do not alter!)
+##### End of part to be duplicated into post-cleanup (do not alter!)
 
 
 # Redirect stdout and errors to console as rc.local does not log anything
@@ -47,29 +47,31 @@ exec 1>/dev/console 2>&1
 
 logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 
-mkdir /tmp/.trash
+install -dm 0700 /tmp/.trash
 
 # grab used ovl filename from dmesg
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
-ovlpath="$( dirname "$ovl" )"
+ovl="$( basename "${ovl}" )"
+# search path again as mountpoint may have been changed later in the boot process...
+ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name "${ovl}" -exec dirname {} \; | head -1 )
 
 # Help randomness for wpa_supplicant and ssh server
 rc-service seedrng start
 
 ## Setup Network interfaces
 if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
-	logger -st ${0##*/} "Wifi setup found !"
+	logger -st ${0##*/} "Configuring wifi..."
 	_apk add wpa_supplicant
 	_preserve "/etc/wpa_supplicant/wpa_supplicant.conf"
 	install -m600 "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
 else
-	logger -st ${0##*/} "Wifi setup not found !"
+	logger -st ${0##*/} "No wifi setup supplied !"
 fi
 
 _preserve "/etc/network/interfaces"
 if ! install -m644 "${ovlpath}/interfaces" /etc/network/interfaces; then
 	# set default interfaces if not specified by interface file on boot storage
-	logger -st ${0##*/} "No interfaces file supplied, building default interfaces..."
+	logger -st ${0##*/} "No interfaces file supplied, building defaults..."
 	for dev in $(ls /sys/class/net)
 	do
 		case ${dev%%[0-9]*} in
@@ -132,12 +134,26 @@ _apk add openssh
 _preserve "/etc/ssh/sshd_config"
 _preserve "/etc/conf.d/sshd"
 
-cat <<-EOF >> /etc/ssh/sshd_config
-	AuthenticationMethods none
-	PermitEmptyPasswords yes
+cat <<-EOF > /etc/ssh/sshd_config
 	PermitRootLogin yes
 	Banner /tmp/.trash/banner
 	EOF
+	
+if install -m600 "${ovlpath}/authorized_keys" /tmp/.trash/authorized_keys; then
+	logger -st ${0##*/} "Enabling public key SSH authentication..."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		AuthenticationMethods publickey
+		AuthorizedKeysFile /tmp/.trash/authorized_keys
+		# relax strict mode as authorized_keys are inside /tmp
+		StrictModes no
+		EOF
+else
+	logger -st ${0##*/} "No SSH authentication."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		AuthenticationMethods none
+		PermitEmptyPasswords yes
+		EOF
+fi
 
 # Banner file
 warn=""
@@ -149,7 +165,7 @@ cat <<-EOF > /tmp/.trash/banner
 	Alpine Linux headless bootstrap v$VERSION by macmpi
 
 You may want to delete/rename .apkovl file before reboot ${warn}:
-$ovl
+${ovlpath}/${ovl}
 (can be done automatically with unattended script - see sample snippet)
 
 
@@ -189,6 +205,16 @@ sed -n '/^#* End .*alter!)$/q;p' /etc/local.d/headless.start > /tmp/.trash/post-
 
 cat <<-EOF >> /tmp/.trash/post-cleanup
 
+	_tst_inet() {
+		## Tested URL redirects to github project page: is.gd shortener provides basic analytics.
+		## Analytics are public and can be checked at https://is.gd/stats.php?url=apkovl_run
+		## Privacy policy: https://is.gd/privacy.php
+		INET="failed"
+		wget -q -T 10 --spider https://is.gd/apkovl_run > /dev/null 2>&1 &&
+			INET="success"
+		logger -st ${0##*/} "Internet access: \$INET"
+	}
+
 	logger -st ${0##*/} "Cleaning-up..."
 	_restore "/etc/ssh/sshd_config"
 	_restore "/etc/conf.d/sshd"
@@ -202,6 +228,11 @@ cat <<-EOF >> /tmp/.trash/post-cleanup
 	rc-update del local default
 	rm /etc/local.d/headless.start
 
+	# Internet connectivity test
+	# Can be skipped by creating a 'opt-out'-named dummy file aside apkovl file
+	[ -f "${ovlpath}/opt-out" ] || _tst_inet &
+
+	# Run unattended script if available
 	if [ -f "${ovlpath}/unattended.sh" ]; then
 		install -m755 "${ovlpath}/unattended.sh" /tmp/unattended.sh
 		/tmp/unattended.sh >/dev/console 2>&1 &
