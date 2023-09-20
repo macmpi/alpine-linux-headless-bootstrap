@@ -51,7 +51,9 @@ install -dm 0700 /tmp/.trash
 
 # grab used ovl filename from dmesg
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
-ovlpath="$( dirname "$ovl" )"
+ovl="$( basename "${ovl}" )"
+# search path again as mountpoint may have been changed later in the boot process...
+ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name "${ovl}" -exec dirname {} \; | head -1 )
 
 # Help randomness for wpa_supplicant and ssh server
 rc-service seedrng start
@@ -163,7 +165,7 @@ cat <<-EOF > /tmp/.trash/banner
 	Alpine Linux headless bootstrap v$VERSION by macmpi
 
 You may want to delete/rename .apkovl file before reboot ${warn}:
-$ovl
+${ovlpath}/${ovl}
 (can be done automatically with unattended script - see sample snippet)
 
 

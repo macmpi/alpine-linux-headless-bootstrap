@@ -14,13 +14,16 @@ sleep 60
 
 
 ## This snippet removes apkovl file on volume after initial boot
+# grab used ovl filename from dmesg
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
-ovlpath="$( dirname "$ovl" )"
+ovl="$( basename "${ovl}" )"
+# search path again as mountpoint may have been changed later in the boot process...
+ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name "${ovl}" -exec dirname {} \; | head -1 )
 
 # also works in case volume is mounted read-only
 grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; RO=$?
 [ "$RO" -eq "0" ] && mount -o remount,rw "${ovlpath}"
-rm -f "${ovl}"
+rm -f "${ovlpath}/${ovl}"
 [ "$RO" -eq "0" ] && mount -o remount,ro "${ovlpath}"
 
 ########################################################
