@@ -3,7 +3,7 @@
 # Copyright 2022 - 2023, macmpi
 # SPDX-License-Identifier: MIT
 
-VERSION="0.8"
+VERSION="0.9"
 
 
 _apk() {
