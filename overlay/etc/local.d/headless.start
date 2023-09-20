@@ -60,18 +60,18 @@ rc-service seedrng start
 
 ## Setup Network interfaces
 if [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
-	logger -st ${0##*/} "Wifi setup found !"
+	logger -st ${0##*/} "Configuring wifi..."
 	_apk add wpa_supplicant
 	_preserve "/etc/wpa_supplicant/wpa_supplicant.conf"
 	install -m600 "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
 else
-	logger -st ${0##*/} "Wifi setup not found !"
+	logger -st ${0##*/} "No wifi setup supplied !"
 fi
 
 _preserve "/etc/network/interfaces"
 if ! install -m644 "${ovlpath}/interfaces" /etc/network/interfaces; then
 	# set default interfaces if not specified by interface file on boot storage
-	logger -st ${0##*/} "No interfaces file supplied, building default interfaces..."
+	logger -st ${0##*/} "No interfaces file supplied, building defaults..."
 	for dev in $(ls /sys/class/net)
 	do
 		case ${dev%%[0-9]*} in
