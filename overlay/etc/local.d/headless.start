@@ -47,7 +47,7 @@ exec 1>/dev/console 2>&1
 
 logger -st ${0##*/} "Alpine Linux headless bootstrap v$VERSION by macmpi"
 
-mkdir /tmp/.trash
+install -dm 0700 /tmp/.trash
 
 # grab used ovl filename from dmesg
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
@@ -132,12 +132,26 @@ _apk add openssh
 _preserve "/etc/ssh/sshd_config"
 _preserve "/etc/conf.d/sshd"
 
-cat <<-EOF >> /etc/ssh/sshd_config
-	AuthenticationMethods none
-	PermitEmptyPasswords yes
+cat <<-EOF > /etc/ssh/sshd_config
 	PermitRootLogin yes
 	Banner /tmp/.trash/banner
 	EOF
+	
+if install -m600 "${ovlpath}/authorized_keys" /tmp/.trash/authorized_keys; then
+	logger -st ${0##*/} "Enabling public key SSH authentication..."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		AuthenticationMethods publickey
+		AuthorizedKeysFile /tmp/.trash/authorized_keys
+		# relax strict mode as authorized_keys are inside /tmp
+		StrictModes no
+		EOF
+else
+	logger -st ${0##*/} "No SSH authentication."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		AuthenticationMethods none
+		PermitEmptyPasswords yes
+		EOF
+fi
 
 # Banner file
 warn=""
