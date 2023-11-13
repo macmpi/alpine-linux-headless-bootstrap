@@ -1,0 +1,12 @@
+#!/sbin/openrc-run
+
+# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-License-Identifier: MIT
+
+description="Headless cleanup script"
+name="Headless cleanup"
+
+command="/tmp/.trash/headless_cleanup"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+

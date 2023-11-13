@@ -1,4 +1,4 @@
-# Copyright 2022 - 2023, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
 # SPDX-License-Identifier: MIT
 
 # Sample network interfaces file
@@ -8,15 +8,12 @@ iface lo inet loopback
 
 auto eth0
 iface eth0 inet dhcp
-	hostname localhost
 
 auto wlan0
 iface wlan0 inet dhcp
-	hostname localhost
 
 auto usb0
 iface usb0 inet static
-    address 10.42.0.2/24
+	address 10.42.0.2/24
 	gateway 10.42.0.1
-	hostname localhost
 
