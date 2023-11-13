@@ -1,0 +1,12 @@
+#!/sbin/openrc-run
+
+# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-License-Identifier: MIT
+
+description="Headless main boostrappring script"
+name="Headless bootstrap"
+
+command="/usr/local/bin/headless_bootstrap"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+

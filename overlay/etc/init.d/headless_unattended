@@ -1,0 +1,12 @@
+#!/sbin/openrc-run
+
+# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-License-Identifier: MIT
+
+description="Headless unattended setup script (optional)"
+name="Headless unattended"
+
+command="/tmp/headless_unattended"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+

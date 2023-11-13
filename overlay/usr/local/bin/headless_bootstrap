@@ -1,0 +1,306 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-License-Identifier: MIT
+
+HDLSBSTRP_VERSION="1.0"
+
+_apk() {
+	local cmd="$1"
+	local pkg="$2"
+
+	case $cmd in
+		add) # install only if not already present
+			if ! apk info | grep -wq "${pkg}"; then
+				apk add "$pkg" && printf '%s ' "${pkg}" >> /tmp/.trash/installed
+			fi
+		;;
+		del) # delete only if previously installed
+			if grep -wq "$pkg" /tmp/.trash/installed > /dev/null 2>&1; then
+				apk del "$pkg" && sed -i 's/\b'"${pkg}"'\b//' /tmp/.trash/installed
+			fi
+		;;
+		*)
+			echo "only add/del: wrong usage"; exit
+		;;
+	esac
+}
+
+_preserve() {
+# create a back-up of element (file, folder, symlink)
+	[ -z "${1}" ] && return 1
+	[ -e "$1" ] && cp -a "$1" "${1}.orig"
+}
+
+_restore() {
+# remove element (file, folder, symlink) and replace by
+# previous back-up if available
+	[ -z "${1}" ] && return 1
+	rm -rf "${1}"
+	[ -e "${1}.orig" ] && mv -f "${1}.orig" "${1}"
+}
+
+# shellcheck disable=SC2142  # known special case
+alias _logger='logger -st "${0##*/}"'
+
+##### End of part to be duplicated into headless_cleanup (do not alter!)
+
+_prep_cleanup() {
+## Prep for final headless_cleanup
+# clears any installed packages and settings
+# copy begininng of this file to keep functions
+sed -n '/^#* End .*alter!)$/q;p' /usr/local/bin/headless_bootstrap > /tmp/.trash/headless_cleanup
+cat <<-EOF >> /tmp/.trash/headless_cleanup
+	# Redirect stdout and errors to console as service won't show messages
+	exec 1>/dev/console 2>&1
+
+	_logger "Cleaning-up..."
+	_restore "/etc/ssh/sshd_config"
+	_restore "/etc/conf.d/sshd"
+	_apk del openssh-server
+	_restore "/etc/wpa_supplicant/wpa_supplicant.conf"
+	_apk del wpa_supplicant
+	_restore "/etc/network/interfaces"
+	_restore "/etc/hostname"
+	rm -f /etc/modprobe.d/headless_gadget.conf
+
+	# remove from boot service to avoid spurious openrc recalls from unattended script
+	rm -f /etc/runlevels/default/headless_bootstrap
+	rm -f /usr/local/bin/headless_bootstrap
+
+	# Run unattended script if available
+	install -m755 "${ovlpath}/unattended.sh" /tmp/headless_unattended > /dev/null 2>&1 && \
+		_logger "Starting headless_unattended service" && \
+		rc-service headless_unattended start
+
+	rm -f /etc/init.d/headless_*
+	_logger "Clean-up done, enjoy !"
+	cat /tmp/.trash/banner > /dev/console
+	if [ -c /dev/ttyGS0 ]; then
+		# Enabling terminal login into ttyGS0 serial for 60 sec
+		# no choice than making permanent change to pre 3.19 versions of /etc/securetty
+		grep -q "ttyGS0" /etc/securetty || echo "ttyGS0" >> /etc/securetty
+		/sbin/getty -L 115200 ttyGS0 vt100 &
+	fi
+	EOF
+chmod +x /tmp/.trash/headless_cleanup
+}
+
+_setup_sshd() {
+## Setup temporary SSH server (root login, no password)
+# We use some bundled (or optionaly provided) keys to avoid generation at startup and save time
+_apk add openssh-server
+_preserve "/etc/ssh/sshd_config"
+_preserve "/etc/conf.d/sshd"
+
+cat <<-EOF > /etc/ssh/sshd_config
+	PermitRootLogin yes
+	Banner /tmp/.trash/banner
+	EOF
+
+# Client authorized_keys or no authentication
+if install -m600 "${ovlpath}/authorized_keys" /tmp/.trash/authorized_keys > /dev/null 2>&1; then
+	_logger "Enabling public key SSH authentication..."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		AuthenticationMethods publickey
+		AuthorizedKeysFile /tmp/.trash/authorized_keys
+		# relax strict mode as authorized_keys are inside /tmp
+		StrictModes no
+		EOF
+else
+	_logger "No SSH authentication."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		AuthenticationMethods none
+		PermitEmptyPasswords yes
+		EOF
+fi
+
+# Server keys: inject optional custom keys, or generate new (might be stored),
+# or use bundeled ones (not stored)
+local keygen_stance="sshd_disable_keygen=yes"
+if install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/ > /dev/null 2>&1; then
+	# check for empty key within injected ones: if found, generate new keys
+	if find /etc/ssh/ -maxdepth 1 -type f -name 'ssh_host_*_key*' -empty | grep -q .; then
+		rm /etc/ssh/ssh_host_*_key*
+		keygen_stance=""
+		_logger "Will generate new SSH keys..."
+	else
+		chmod 644 /etc/ssh/ssh_host_*_key.pub
+		_logger "Using injected SSH keys..."
+	fi
+else
+	_logger "Using bundled ssh keys from RAM..."
+	cat <<-EOF >> /etc/ssh/sshd_config
+		HostKey /tmp/.trash/ssh_host_ed25519_key
+		HostKey /tmp/.trash/ssh_host_rsa_key
+		EOF
+fi
+
+echo "$keygen_stance" >> /etc/conf.d/sshd
+rc-service sshd restart
+}
+
+_tst_version() {
+# Tested URL redirects to github project page: is.gd shortener provides basic analytics.
+# Analytics are public and can be checked at https://is.gd/stats.php?url=apkovl_run
+# Privacy policy: https://is.gd/privacy.php
+local new_vers=""
+local status="failed"
+local ref="/macmpi/alpine-linux-headless-bootstrap/releases/tag/v"
+if wget -q -O /tmp/homepg -T 10 https://is.gd/apkovl_run > /dev/null 2>&1; then
+	status="success"
+	ver="$( grep -o "$ref.*\"" /tmp/homepg | grep -Eo '[0-9]+[\.[0-9]+]*' )"
+	rm -f /tmp/homepg
+	[ -n "$ver" ] && ! [ "$ver" = "$HDLSBSTRP_VERSION" ] && \
+		new_vers="!! Version $ver is available on Github project page !!" && \
+		_logger "$new_vers" && \
+		printf '%s\n\n' "$new_vers" >> /tmp/.trash/banner
+fi
+_logger "Internet access: $status"
+}
+
+_setup_networking() {
+## Setup Network interfaces
+if [ -d "/sys/class/net/wlan0" ] && [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
+	_logger "Configuring wifi..."
+	_apk add wpa_supplicant
+	_preserve "/etc/wpa_supplicant/wpa_supplicant.conf"
+	install -m600 "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
+else
+	_logger "No wifi interface or setup file supplied"
+fi
+
+_preserve "/etc/network/interfaces"
+if ! install -m644 "${ovlpath}/interfaces" /etc/network/interfaces > /dev/null 2>&1; then
+	# set default interfaces if not specified by interface file on boot storage
+	_logger "No interfaces file supplied, building defaults..."
+	for dev in /sys/class/net/*; do
+		dev="$(basename "$dev")"
+		case ${dev%%[0-9]*} in
+			lo)
+					cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet loopback
+
+					EOF
+					;;
+			eth)
+					cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet dhcp
+
+					EOF
+					;;
+			wlan)
+					[ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet dhcp
+
+					EOF
+					;;
+			usb)
+					cat <<-EOF >> /etc/network/interfaces
+					auto $dev
+					iface $dev inet static
+					    address 10.42.0.2/24
+					    gateway 10.42.0.1
+
+					EOF
+
+					cat <<-EOF > /etc/resolv.conf
+					nameserver 208.67.222.222
+					nameserver 208.67.220.220
+
+					EOF
+					;;
+		esac
+	done
+fi
+
+echo "###################################"
+echo "Using following network interfaces:"
+cat /etc/network/interfaces
+echo "###################################"
+
+_preserve "/etc/hostname"
+echo "alpine-headless" > /etc/hostname
+hostname -F /etc/hostname
+
+grep -q "wlan" /etc/network/interfaces && \
+	[ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && \
+		rc-service wpa_supplicant restart
+rc-service networking restart
+}
+
+_setup_gadget() {
+# load composite USB Serial/USB Ethernel driver & setup terminal
+_logger "Enabling USB-gadget Serial and Ethernet ports"
+lsmod | grep -q "dwc2" || modprobe -qs dwc2
+modprobe -qs g_cdc
+# default config: xon/xoff flow control
+stty -g -F /dev/ttyGS0 >/dev/null 2>&1 && setconsole /dev/ttyGS0
+# notes to users willing to connect from Linux Ubuntu-based host terminal:
+# - user on host needs to be part of dialout group (reboot required), and
+# - disable spurious AT commands from ModemManager on host-side Gadget serial port
+# you may create a /etc/udev/rules.d/99-ttyacms-gadget.rules as per:
+# https://linux-tips.com/t/prevent-modem-manager-to-capture-usb-serial-devices/284/2
+# ATTRS{idVendor}=="0525" ATTRS{idProduct}=="a4aa", ENV{ID_MM_DEVICE_IGNORE}="1"
+}
+
+
+#############################################################################
+## Main
+
+# Redirect stdout and errors to console as service won't show messages
+exec 1>/dev/console 2>&1
+_logger "Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi"
+
+# help randomness for wpa_supplicant and sshd (urandom until 3.16)
+rc-service seedrng restart || rc-service urandom restart
+
+# setup USB gadget mode if device has compatible device-tree
+find /proc/device-tree/soc/usb* -name "dr_mode" -print0 | \
+	xargs -0 grep -q "peripheral" && _setup_gadget
+
+# Determine ovl file location
+# grab used ovl filename from dmesg
+ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
+if [ -f "${ovl}" ]; then
+	ovlpath="$( dirname "$ovl" )"
+else
+	# search path again as mountpoint have been changed later in the boot process...
+	ovl="$( basename "${ovl}" )"
+	ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name "${ovl}" -exec dirname {} \; | head -1 )
+	ovl="${ovlpath}/${ovl}"
+fi
+
+# Create banner file
+warn=""
+grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; RO=$?
+[ "$RO" -eq "0" ] && warn="(remount partition rw!)"
+cat <<-EOF > /tmp/.trash/banner
+
+	Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi
+	
+	You may want to delete/rename .apkovl file before reboot ${warn}:
+	${ovl}
+	(can be done automatically with unattended script - see sample snippet)
+
+
+	EOF
+
+_setup_networking
+
+# Test latest available version online
+# Can be skipped by creating a 'opt-out'-named dummy file aside apkovl file
+[ -f "${ovlpath}/opt-out" ] || _tst_version &
+
+# setup sshd unless unattended.sh script prevents it
+grep -q "^#NO_SSH$" "${ovlpath}/unattended.sh" > /dev/null 2>&1 \
+	|| _setup_sshd
+
+_prep_cleanup
+_logger "Initial setup done, handing-over to clean-up"
+rc-service headless_cleanup start
+exit 0
+

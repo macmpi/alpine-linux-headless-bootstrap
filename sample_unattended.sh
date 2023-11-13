@@ -1,29 +1,45 @@
-#/bin/sh
+#!/bin/sh
 
-# Copyright 2022 - 2023, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
 # SPDX-License-Identifier: MIT
 
 ## collection of few code snippets as sample unnatteded actions some may find usefull
 
+## will run encapusated within headless_unattended OpenRC service
 
-## Obvious one; reminder: is run in the background
-echo hello world !!
+# To prevent headless bootstrap script from starting sshd
+# only keep a single starting # on the line below
+##NO_SSH
+
+# Uncomment to enable stdout and errors redirection to console (service won't show messages)
+# exec 1>/dev/console 2>&1
+
+# shellcheck disable=SC2142  # known special case
+alias _logger='logger -st "${0##*/}"'
+
+## Obvious one; reminder: is run as background service
+_logger "hello world !!"
 sleep 60
-
+_logger "Finished script"
 ########################################################
 
 
 ## This snippet removes apkovl file on volume after initial boot
 # grab used ovl filename from dmesg
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
-ovl="$( basename "${ovl}" )"
-# search path again as mountpoint may have been changed later in the boot process...
-ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name "${ovl}" -exec dirname {} \; | head -1 )
+if [ -f "${ovl}" ]; then
+	ovlpath="$( dirname "$ovl" )"
+else
+	# search path again as mountpoint have been changed later in the boot process...
+	ovl="$( basename "${ovl}" )"
+	ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name "${ovl}" -exec dirname {} \; | head -1 )
+	ovl="${ovlpath}/${ovl}"
+fi
 
 # also works in case volume is mounted read-only
 grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; RO=$?
 [ "$RO" -eq "0" ] && mount -o remount,rw "${ovlpath}"
-rm -f "${ovlpath}/${ovl}"
+rm -f "${ovl}"
 [ "$RO" -eq "0" ] && mount -o remount,ro "${ovlpath}"
 
 ########################################################
@@ -33,7 +49,7 @@ rm -f "${ovlpath}/${ovl}"
 # note: with INTERFACESOPTS=none, no networking will be setup so it won't work after reboot!
 # Change it or run setup-interfaces in interractive mode afterwards (and lbu commit -d thenafter)
 
-logger -st ${0##*/} "Setting-up minimal environment"
+_logger "Setting-up minimal environment"
 
 cat <<-EOF > /tmp/ANSWERFILE
 	# base answer file for setup-alpine script
@@ -88,5 +104,5 @@ lbu commit -d
 ########################################################
 
 
-logger -st ${0##*/} "Finished unattended script"
+_logger "Finished unattended script"
 
