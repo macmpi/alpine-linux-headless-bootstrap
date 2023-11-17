@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
 # SPDX-License-Identifier: MIT
 
-HDLSBSTRP_VERSION="1.0"
+HDLSBSTRP_VERSION="1.1"
 
 _apk() {
 	local cmd="$1"
@@ -29,7 +29,7 @@ _apk() {
 _preserve() {
 # create a back-up of element (file, folder, symlink)
 	[ -z "${1}" ] && return 1
-	[ -e "$1" ] && cp -a "$1" "${1}.orig"
+	[ -e "${1}" ] && cp -a "${1}" "${1}".orig
 }
 
 _restore() {
@@ -37,7 +37,7 @@ _restore() {
 # previous back-up if available
 	[ -z "${1}" ] && return 1
 	rm -rf "${1}"
-	[ -e "${1}.orig" ] && mv -f "${1}.orig" "${1}"
+	[ -e "${1}".orig ] && mv -f "${1}".orig "${1}"
 }
 
 # shellcheck disable=SC2142  # known special case
@@ -69,7 +69,7 @@ cat <<-EOF >> /tmp/.trash/headless_cleanup
 	rm -f /usr/local/bin/headless_bootstrap
 
 	# Run unattended script if available
-	install -m755 "${ovlpath}/unattended.sh" /tmp/headless_unattended > /dev/null 2>&1 && \
+	install -m755 "${ovlpath}"/unattended.sh /tmp/headless_unattended > /dev/null 2>&1 && \
 		_logger "Starting headless_unattended service" && \
 		rc-service headless_unattended start
 
@@ -99,7 +99,7 @@ cat <<-EOF > /etc/ssh/sshd_config
 	EOF
 
 # Client authorized_keys or no authentication
-if install -m600 "${ovlpath}/authorized_keys" /tmp/.trash/authorized_keys > /dev/null 2>&1; then
+if install -m600 "${ovlpath}"/authorized_keys /tmp/.trash/authorized_keys > /dev/null 2>&1; then
 	_logger "Enabling public key SSH authentication..."
 	cat <<-EOF >> /etc/ssh/sshd_config
 		AuthenticationMethods publickey
@@ -161,58 +161,66 @@ _logger "Internet access: $status"
 
 _setup_networking() {
 ## Setup Network interfaces
-if [ -d "/sys/class/net/wlan0" ] && [ -f "${ovlpath}/wpa_supplicant.conf" ]; then
+local has_wifi
+_has_wifi() { return "$has_wifi"; }
+
+find /sys/class/ieee80211/*/device/net/* -maxdepth 0 -type d -exec basename {} \; > /tmp/.wlan_list 2>/dev/null
+[ -s /tmp/.wlan_list ] && [ -f "${ovlpath}"/wpa_supplicant.conf ]
+has_wifi=$?
+if _has_wifi; then
 	_logger "Configuring wifi..."
 	_apk add wpa_supplicant
 	_preserve "/etc/wpa_supplicant/wpa_supplicant.conf"
-	install -m600 "${ovlpath}/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
+	install -m600 "${ovlpath}"/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
+	rc-service wpa_supplicant restart
 else
-	_logger "No wifi interface or setup file supplied"
+	_logger "No wifi interface or SSID/pass file supplied"
 fi
 
 _preserve "/etc/network/interfaces"
-if ! install -m644 "${ovlpath}/interfaces" /etc/network/interfaces > /dev/null 2>&1; then
-	# set default interfaces if not specified by interface file on boot storage
+if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces > /dev/null 2>&1; then
 	_logger "No interfaces file supplied, building defaults..."
+	cat <<-EOF > /etc/network/interfaces
+		auto lo
+		iface lo inet loopback
+
+		EOF
 	for dev in /sys/class/net/*; do
-		dev="$(basename "$dev")"
-		case ${dev%%[0-9]*} in
+		# shellcheck disable=SC2034  # Unused IFINDEX while still sourced from uevent
+		local DEVTYPE INTERFACE IFINDEX
+		DEVTYPE=""
+		# shellcheck source=/dev/null
+		. "$dev"/uevent
+		case ${INTERFACE%%[0-9]*} in
 			lo)
-					cat <<-EOF >> /etc/network/interfaces
-					auto $dev
-					iface $dev inet loopback
-
-					EOF
-					;;
+				;;
 			eth)
+				cat <<-EOF >> /etc/network/interfaces
+					auto $INTERFACE
+					iface $INTERFACE inet dhcp
+
+					EOF
+				;;
+			*)
+				_has_wifi && grep -q "$INTERFACE" /tmp/.wlan_list && \
 					cat <<-EOF >> /etc/network/interfaces
-					auto $dev
-					iface $dev inet dhcp
+						auto $INTERFACE
+						iface $INTERFACE inet dhcp
 
-					EOF
-					;;
-			wlan)
-					[ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && cat <<-EOF >> /etc/network/interfaces
-					auto $dev
-					iface $dev inet dhcp
+						EOF
+				[ "$DEVTYPE" = "gadget" ] && \
+					cat <<-EOF >> /etc/network/interfaces && cat <<-EOF > /etc/resolv.conf
+						auto $INTERFACE
+						iface $INTERFACE inet static
+						    address 10.42.0.2/24
+						    gateway 10.42.0.1
 
-					EOF
-					;;
-			usb)
-					cat <<-EOF >> /etc/network/interfaces
-					auto $dev
-					iface $dev inet static
-					    address 10.42.0.2/24
-					    gateway 10.42.0.1
+						EOF
+						nameserver 208.67.222.222
+						nameserver 208.67.220.220
 
-					EOF
-
-					cat <<-EOF > /etc/resolv.conf
-					nameserver 208.67.222.222
-					nameserver 208.67.220.220
-
-					EOF
-					;;
+						EOF
+				;;
 		esac
 	done
 fi
@@ -226,25 +234,31 @@ _preserve "/etc/hostname"
 echo "alpine-headless" > /etc/hostname
 hostname -F /etc/hostname
 
-grep -q "wlan" /etc/network/interfaces && \
-	[ -f /etc/wpa_supplicant/wpa_supplicant.conf ] && \
-		rc-service wpa_supplicant restart
 rc-service networking restart
+rm -f /tmp/.wlan_list
 }
 
 _setup_gadget() {
-# load composite USB Serial/USB Ethernel driver & setup terminal
+## load composite USB Serial/USB Ethernel driver & setup terminal
 _logger "Enabling USB-gadget Serial and Ethernet ports"
 lsmod | grep -q "dwc2" || modprobe -qs dwc2
-modprobe -qs g_cdc
-# default config: xon/xoff flow control
-stty -g -F /dev/ttyGS0 >/dev/null 2>&1 && setconsole /dev/ttyGS0
+# remove conflicting modules in case they were initially loaded (cmdline.txt)
+modprobe -rq g_serial g_ether g_cdc
+modprobe -q g_cdc && sleep 1
+# once driver has settled check if cable is connected: unload if not
+[ "$( cat "$udc_gadget"/current_speed )" = "UNKNOWN" ] && \
+	_logger "USB cable not connected !!" && modprobe -rq g_cdc && return 1
+
+# default serial config: xon/xoff flow control
+stty -g -F /dev/ttyGS0 >/dev/null 2>&1
 # notes to users willing to connect from Linux Ubuntu-based host terminal:
 # - user on host needs to be part of dialout group (reboot required), and
 # - disable spurious AT commands from ModemManager on host-side Gadget serial port
 # you may create a /etc/udev/rules.d/99-ttyacms-gadget.rules as per:
 # https://linux-tips.com/t/prevent-modem-manager-to-capture-usb-serial-devices/284/2
 # ATTRS{idVendor}=="0525" ATTRS{idProduct}=="a4aa", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+setconsole /dev/ttyGS0
 }
 
 
@@ -258,9 +272,10 @@ _logger "Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi"
 # help randomness for wpa_supplicant and sshd (urandom until 3.16)
 rc-service seedrng restart || rc-service urandom restart
 
-# setup USB gadget mode if device has compatible device-tree
-find /proc/device-tree/soc/usb* -name "dr_mode" -print0 | \
-	xargs -0 grep -q "peripheral" && _setup_gadget
+# setup USB gadget mode if such device mode is enabled
+udc_gadget="$( dirname "$( find -L /sys/class/udc/* -maxdepth 2 -type f -name "is_a_peripheral" 2>/dev/null)" )"
+[ "$( cat "$udc_gadget"/is_a_peripheral 2>/dev/null )" = "0" ] && \
+	_setup_gadget
 
 # Determine ovl file location
 # grab used ovl filename from dmesg
@@ -293,10 +308,10 @@ _setup_networking
 
 # Test latest available version online
 # Can be skipped by creating a 'opt-out'-named dummy file aside apkovl file
-[ -f "${ovlpath}/opt-out" ] || _tst_version &
+[ -f "${ovlpath}"/opt-out ] || _tst_version &
 
 # setup sshd unless unattended.sh script prevents it
-grep -q "^#NO_SSH$" "${ovlpath}/unattended.sh" > /dev/null 2>&1 \
+grep -q "^#NO_SSH$" "${ovlpath}"/unattended.sh > /dev/null 2>&1 \
 	|| _setup_sshd
 
 _prep_cleanup
