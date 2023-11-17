@@ -12,7 +12,7 @@ Please follow [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation
 Tools provided here can be used on any plaform for any install modes (diskless, data disk, system disk).
 
 Just add [**headless.apkovl.tar.gz**](https://is.gd/apkovl_master)[^2] overlay file *as-is* at the root of Alpine Linux boot media (or onto any custom side-media) and boot-up the system.\
-With default DCHP-based network interface definitions (and [SSID/pass file](#extra-configuration) if using wifi), system can then be remotely accessed with: `ssh root@<IP>`\
+With default DCHP-based network interface definitions (and [SSID/pass](#extra-configuration) file if using wifi), system can then be remotely accessed with: `ssh root@<IP>`\
 (system IP address may be determined with any IP scanning tools such as `nmap`).
 
 As with Alpine Linux initial bring-up, `root` account has no password initially (change that during target setup!).\
@@ -29,7 +29,7 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 
 **Goody:** seamless USB-serial & USB-ethernet gadget mode (PiZero for instance):\
 On supporting Pi devices, just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` (or `config.txt`), and plug USB cable into host Computer port.\
-Serial terminal can then be connected-to from host Computer (xon/xoff flow control: e.g. on Linux with `cu -l ttyACM0`).\
+Serial terminal can then be connected-to from host Computer (e.g. `cu -l ttyACM0` on Linux. xon/xoff flow control).\
 Alternatively, with host Computer set-up to share networking with USB interface as 10.42.0.1 gateway, one can log into device from host with: `ssh root@10.42.0.2`.
 
 Main execution steps are logged: `cat /var/log/messages | grep headless`.
@@ -44,7 +44,8 @@ Main execution steps are logged: `cat /var/log/messages | grep headless`.
 ## Want to tweak more ?
 This repository may be forked/cloned/downloaded.\
 Main script file is [`headless.start`](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/usr/local/bin/headless_bootstrap).\
-Execute `./make.sh` to rebuild `headless.apkovl.tar.gz` after changes.
+Execute `./make.sh` to rebuild `headless.apkovl.tar.gz` after changes.\
+(requires `busybox`; check `busybox` build options if not running from Alpine or Ubuntu)
 
 
 ## Credits
