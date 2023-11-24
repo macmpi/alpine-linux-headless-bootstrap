@@ -30,7 +30,8 @@ if [ -n "$build_path" ]; then
 	doas tar cv -C "$build_path"/overlay --no-recursion \
 		$(doas find "$build_path"/overlay/ | sed "s|$build_path/overlay/||" | sort | xargs ) | \
 			gzip -c9n > headless.apkovl.tar.gz
-	TZ=UTC touch -cm -t "$t_stamp" headless.apkovl.tar.gz
+	sha512sum headless.apkovl.tar.gz > headless.apkovl.tar.gz.sha512
+	TZ=UTC touch -cm -t "$t_stamp" headless.apkovl.tar.gz*
 	doas rm -rf "$build_path"
 fi
 

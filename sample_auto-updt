@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-License-Identifier: MIT
+
+# Automated reboot after update is cancelled if:
+# - there is an opened ssh session
+# - unattended.sh script is provided
+
+# Uncomment line below to enable reboot after update
+#reboot
+

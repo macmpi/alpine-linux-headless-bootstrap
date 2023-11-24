@@ -25,14 +25,17 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 - `interfaces`[^3] (*optional*): define network interfaces at will, if defaults DCHP-based are not suitable.
 - `authorized_keys` (*optional*): provide client's public SSH key to secure `root` ssh login.
 - `ssh_host_*_key*` (*optional*): provide server's custom ssh keys to be injected (may be stored), instead of using bundled ones[^2] (not stored). Providing an empty key file will trigger new keys generation (ssh server may take longer to start).
-
-
-**Goody:** seamless USB-serial & USB-ethernet gadget mode (PiZero for instance):\
-On supporting Pi devices, just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` (or `config.txt`), and plug USB cable into host Computer port.\
-Serial terminal can then be connected-to from host Computer (e.g. `cu -l ttyACM0` on Linux. xon/xoff flow control).\
-Alternatively, with host Computer set-up to share networking with USB interface as 10.42.0.1 gateway, one can log into device from host with: `ssh root@10.42.0.2`.
+- `auto-updt` (*optional*): allow apkovl file automatic update with latest from master branch. If it contains *reboot* keyword all in one line, system will reboot after succesful update (unless ssh session is active or `unattended.sh` script is available).
 
 Main execution steps are logged: `cat /var/log/messages | grep headless`.
+
+## Goody:
+Seamless USB-serial & USB-ethernet gadget mode (*e.g. PiZero*):
+- Make sure dwc2/dwc3 driver is loaded accordingly, and device configuration is set to `peripheral` mode: this may be hardware (including cable) and/or software driven.\
+(on supporting Pi devices, just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` (or `config.txt`) to force by software)
+- Plug USB cable into host Computer port before boot.\
+Serial terminal can then be connected-to from host Computer (e.g. `cu -l ttyACM0` on Linux. xon/xoff flow control).\
+Alternatively, with host Computer set-up to share networking with USB interface as 10.42.0.1 gateway, one can log into device from host with: `ssh root@10.42.0.2`.
 
 [^1]: Initial boot fully preserves system's original state (config files & installed packages): a fresh system will therefore come-up as unconfigured.
 
