@@ -37,10 +37,11 @@ else
 fi
 
 # also works in case volume is mounted read-only
-grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; RO=$?
-[ "$RO" -eq "0" ] && mount -o remount,rw "${ovlpath}"
+grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; is_ro=$?
+_is_ro() { return "$is_ro"; }
+_is_ro && mount -o remount,rw "${ovlpath}"
 rm -f "${ovl}"
-[ "$RO" -eq "0" ] && mount -o remount,ro "${ovlpath}"
+_is_ro && mount -o remount,ro "${ovlpath}"
 
 ########################################################
 
