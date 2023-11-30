@@ -3,8 +3,14 @@
 # SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
 # SPDX-License-Identifier: MIT
 
-# script meant to be run on Alpine (busybox) or on Ubuntu
-# verify busybox build options if eventually using other platforms
+# Script meant to be run on Alpine (busybox) or on Ubuntu.
+# Check busybox version & options if eventually using other platforms.
+
+# Ubuntu LTS busybox 1.30.1 tar does NOT support setting owner/group/mtime
+# probably available after busybox 1.31.1, following 2019-08-01 change:
+# https://git.busybox.net/busybox/commit/?id=e6a87e74837ba5f2f2207a75cd825acf8cf28afb
+# This limitation requires copying files and setting owner/group/mtime before archiving.
+
 command -v doas > /dev/null || alias doas="/usr/bin/sudo"
 
 build_path="$(mktemp -d)"
