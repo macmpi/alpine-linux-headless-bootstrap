@@ -47,7 +47,7 @@ Alternatively, with host Computer set-up to share networking with USB interface 
 
 ## Want to tweak more ?
 This repository may be forked/cloned/downloaded.\
-Main script file is [`headless_bootstrap`](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/usr/local/bin/headless_bootstrap).\
+Main script file is [`headless.start`](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/usr/local/bin/headless_bootstrap).\
 Execute `./make.sh` to rebuild `headless.apkovl.tar.gz` after changes.\
 (requires `busybox`; check `busybox` build options if not running from Alpine or Ubuntu)
 
