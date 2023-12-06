@@ -25,6 +25,7 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 - `interfaces`[^3] (*optional*): define network interfaces at will, if defaults DCHP-based are not suitable.
 - `authorized_keys` (*optional*): provide client's public SSH key to secure `root` ssh login.
 - `ssh_host_*_key*` (*optional*): provide server's custom ssh keys to be injected (may be stored), instead of using bundled ones[^2] (not stored). Providing an empty key file will trigger new keys generation (ssh server may take longer to start).
+- `opt-out` (*optional*): dummy file to opt-out internet features (connection status, version check, auto-update) and related links usage anonymous [telemetry](https://is.gd/privacy.php).
 - `auto-updt` (*optional*): allow apkovl file automatic update with latest from master branch. If it contains *reboot* keyword all in one line, system will reboot after succesful update (unless ssh session is active or `unattended.sh` script is available).
 
 Main execution steps are logged: `cat /var/log/messages | grep headless`.
@@ -46,7 +47,7 @@ Alternatively, with host Computer set-up to share networking with USB interface 
 
 ## Want to tweak more ?
 This repository may be forked/cloned/downloaded.\
-Main script file is [`headless.start`](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/usr/local/bin/headless_bootstrap).\
+Main script file is [`headless_bootstrap`](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/usr/local/bin/headless_bootstrap).\
 Execute `./make.sh` to rebuild `headless.apkovl.tar.gz` after changes.\
 (requires `busybox`; check `busybox` build options if not running from Alpine or Ubuntu)
 
