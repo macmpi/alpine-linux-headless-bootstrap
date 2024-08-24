@@ -68,7 +68,7 @@ cat <<-EOF > /tmp/ANSWERFILE
 	INTERFACESOPTS=none
 
 	# Set Public nameserver
-	DNSOPTS="-n 208.67.222.222"
+	DNSOPTS="-n 9.9.9.9"
 
 	# Set timezone to UTC
 	TIMEZONEOPTS="UTC"
