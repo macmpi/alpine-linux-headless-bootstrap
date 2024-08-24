@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
 # SPDX-License-Identifier: MIT
 
-HDLSBSTRP_VERSION="1.2"
+HDLSBSTRP_VERSION="1.2.1"
 
 _apk() {
 	local cmd="$1"
@@ -263,8 +263,8 @@ if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>
 								    gateway 10.42.0.1
 
 								EOF
-								nameserver 208.67.222.222
-								nameserver 208.67.220.220
+								nameserver 9.9.9.9
+								nameserver 149.112.112.112
 
 								EOF
 				;;
