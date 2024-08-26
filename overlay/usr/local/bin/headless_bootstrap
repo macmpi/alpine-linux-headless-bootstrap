@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
 # SPDX-License-Identifier: MIT
 
-HDLSBSTRP_VERSION="1.2.1"
+HDLSBSTRP_VERSION="1.2.2"
 
 _apk() {
 	local cmd="$1"
@@ -150,18 +150,20 @@ local file_url="https://is.gd/apkovl_master"
 local sha_url="https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz.sha512"
 local updt_status="failed, keeping original version"
 
-if wget -q -O /tmp/apkovl -T 10 "$file_url" >/dev/null 2>&1 && \
+# Ensure system date is correct to allow SSL transactions
+ntpd -N -p pool.ntp.org -n -q
+
+_is_ro && mount -o remount,rw "${ovlpath}"
+if wget -q -O "${ovl}_new" -T 10 "$file_url" >/dev/null 2>&1 && \
 	wget -q -O /tmp/sha -T 10 "$sha_url" >/dev/null 2>&1 && \
-	[ "$( sha512sum /tmp/apkovl | awk '{print $1}' )" = "$( awk '{print $1}' /tmp/sha )" ]; then
-		_is_ro && mount -o remount,rw "${ovlpath}"
-		cp /tmp/apkovl "${ovl}"
-		_is_ro && mount -o remount,ro "${ovlpath}"
-		! [ "$( sha512sum "${ovl}" | awk '{print $1}' )" = "$( awk '{print $1}' /tmp/sha )" ] && \
-			_logger "Bad update: original apkovl file may be altered, please check!..." && return 1
+	[ "$( sha512sum "${ovl}_new" | awk '{print $1}' )" = "$( awk '{print $1}' /tmp/sha )" ]; then
+		mv -f "${ovl}_new" "${ovl}"
 		updt_status="successful"
 fi
-rm -f /tmp/apkovl /tmp/sha
+rm -f "${ovl}_new" /tmp/sha
+_is_ro && mount -o remount,ro "${ovlpath}"
 _logger "Update $updt_status"
+
 if [ "$updt_status" = "successful" ]; then
 	printf '%s\n\n' "Updated" >>/tmp/.trash/banner
 else
@@ -185,7 +187,7 @@ local vers=""
 local ref="/macmpi/alpine-linux-headless-bootstrap/releases/tag/v"
 local url="https://is.gd/apkovl_run"
 
-if wget -q -O /tmp/homepg -T 10 "$url" >/dev/null 2>&1; then
+if wget -q -O /tmp/homepg -T 10 --no-check-certificate "$url" >/dev/null 2>&1; then
 	_logger "Internet access: success"
 	vers="$( grep -o "$ref.*\"" /tmp/homepg | grep -Eo '[0-9]+[\.[0-9]+]*' )"
 	rm -f /tmp/homepg
