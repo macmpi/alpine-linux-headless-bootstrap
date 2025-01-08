@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
 # SPDX-License-Identifier: MIT
 
-HDLSBSTRP_VERSION="1.2.2"
+HDLSBSTRP_VERSION="1.2.3"
 
 _apk() {
 	local cmd="$1"
@@ -91,6 +91,9 @@ _setup_sshd() {
 ## Setup temporary SSH server (root login, no password):
 # we use some bundled (or optionaly provided) keys to avoid generation at startup and save time.
 _apk add openssh-server
+# Preserve sshd-session & al binaries before uninstall
+[ -d /usr/lib/ssh ] && cp -a /usr/lib/ssh /tmp/.trash/.
+
 _preserve "/etc/ssh/sshd_config"
 _preserve "/etc/conf.d/sshd"
 
@@ -116,6 +119,15 @@ else
 		EOF
 fi
 
+# Define sshd-session & al files new location into sshd_config
+for f in /tmp/.trash/ssh/sshd-*; do
+	[ -e "$f" ] || continue # protect failing glob
+	name=$(echo $(basename $f) | cut -c6-)
+	initial=$(echo $name | cut -c1 | tr [a-z] [A-Z])
+	final=$(echo $name | cut -c2-)
+	echo "Sshd${initial}${final}Path $f" >>/etc/ssh/sshd_config
+done
+
 # Server keys: inject optional custom keys, or generate new (might be stored),
 # or use bundeled ones (not stored)
 local keygen_stance="sshd_disable_keygen=yes"
@@ -138,6 +150,7 @@ else
 fi
 
 echo "$keygen_stance" >>/etc/conf.d/sshd
+
 rc-service sshd restart
 }
 
@@ -165,7 +178,7 @@ _is_ro && mount -o remount,ro "${ovlpath}"
 _logger "Update $updt_status"
 
 if [ "$updt_status" = "successful" ]; then
-	printf '%s\n\n' "Updated" >>/tmp/.trash/banner
+	printf '%s\n\n' "Updated (Read release notes!)" >>/tmp/.trash/banner
 else
 	printf '\n' >>/tmp/.trash/banner
 	return 1
@@ -229,6 +242,7 @@ if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>
 
 		EOF
 	for dev in /sys/class/net/*; do
+		[ -e "$dev" ] || continue # protect failing glob
 		# shellcheck disable=SC2034  # Unused IFINDEX while still sourced from uevent.
 		local DEVTYPE INTERFACE IFINDEX
 		DEVTYPE=""
