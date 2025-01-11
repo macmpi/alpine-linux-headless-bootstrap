@@ -1,6 +1,6 @@
 #!/bin/busybox sh
 
-# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
 # Script meant to be run on Alpine (busybox) or on Ubuntu.
