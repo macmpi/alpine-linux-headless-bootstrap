@@ -311,35 +311,68 @@ rc-service networking restart
 }
 
 _setup_gadget() {
-## Load composite USB Serial/USB Ethernel driver & setup terminal.
-_logger "Enabling USB-gadget Serial and Ethernet ports"
+## Load USB gadget driver & setup based on configuration.
+_logger "Configuring USB-gadget mode"
+
+# Check for gadget type preference (default to g_cdc for compatibility)
+gadget_type="g_cdc"
+if [ -f "${ovlpath}/gadget_type" ]; then
+    gadget_type="$(cat "${ovlpath}/gadget_type" | tr -d '[:space:]')"
+    _logger "Using gadget type from config: $gadget_type"
+fi
+
 # Remove conflicting modules in case they were initially loaded (cmdline.txt).
 modprobe -r g_serial g_ether g_cdc
-modprobe g_cdc
-# Wait for g_cdc to settle and serial ports become available
-timeout 1 sh <<-EOF
-	while ! grep -q "ttyGS" /proc/devices; do sleep 0.2; done
-	EOF
+
+case "$gadget_type" in
+	"g_ether")
+		_logger "Enabling USB-gadget Ethernet port (g_ether)"
+		modprobe g_ether
+		# Wait for g_ether to settle
+		sleep 1
+		;;
+	"g_cdc"|*)
+		_logger "Enabling USB-gadget CDC ports (g_cdc)"
+		modprobe g_cdc
+		# Wait for g_cdc to settle and serial ports become available
+		timeout 1 sh <<-EOF
+			while ! grep -q "ttyGS" /proc/devices; do sleep 0.2; done
+			EOF
+		;;
+esac
 
 # Determine which gadget ID is connected with USB cable (assume just one max).
 # (setting console to unconnected serial port would block boot)
 gdgt_id="$( find /sys/class/udc/*/current_speed -exec \
 	sh -c 'grep -vq "UNKNOWN" "$0" && find ${0/current_speed/}device/gadget.* -maxdepth 0' {} \; \
 		| sed 's/\/.*gadget\.//' )"
-if [ -c /dev/ttyGS"${gdgt_id}" ]; then
-	# Default serial config: xon/xoff flow control.
-	stty -F /dev/ttyGS"${gdgt_id}"
-	setconsole /dev/ttyGS"${gdgt_id}"
-	# Notes to users willing to connect from Linux Ubuntu-based host terminal:
-	# - user on host needs to be part of dialout group (reboot required), and
-	# - disable spurious AT commands from ModemManager on host-side Gadget serial port
-	# one may create a /etc/udev/rules.d/99-ttyacms-gadget.rules as per:
-	# https://linux-tips.com/t/prevent-modem-manager-to-capture-usb-serial-devices/284/2
-	# ATTRS{idVendor}=="0525" ATTRS{idProduct}=="a4aa", ENV{ID_MM_DEVICE_IGNORE}="1"
-else
-	_logger "USB-gadget port not connected !"
-	modprobe -r g_cdc
-fi
+
+case "$gadget_type" in
+	"g_ether")
+		if [ -n "$gdgt_id" ] && find /sys/class/udc/*/device/gadget."${gdgt_id}"/net/* -maxdepth 0 >/dev/null 2>&1; then
+			_logger "USB-gadget Ethernet interface detected"
+		else
+			_logger "USB-gadget port not connected !"
+			modprobe -r g_ether
+		fi
+		;;
+	"g_cdc"|*)
+		if [ -c /dev/ttyGS"${gdgt_id}" ]; then
+			# Default serial config: xon/xoff flow control.
+			stty -F /dev/ttyGS"${gdgt_id}"
+			setconsole /dev/ttyGS"${gdgt_id}"
+			# Notes to users willing to connect from Linux Ubuntu-based host terminal:
+			# - user on host needs to be part of dialout group (reboot required), and
+			# - disable spurious AT commands from ModemManager on host-side Gadget serial port
+			# one may create a /etc/udev/rules.d/99-ttyacms-gadget.rules as per:
+			# https://linux-tips.com/t/prevent-modem-manager-to-capture-usb-serial-devices/284/2
+			# ATTRS{idVendor}=="0525" ATTRS{idProduct}=="a4aa", ENV{ID_MM_DEVICE_IGNORE}="1"
+		else
+			_logger "USB-gadget port not connected !"
+			modprobe -r g_cdc
+		fi
+		;;
+esac
 }
 
 
@@ -353,13 +386,6 @@ _logger "Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi"
 # Help randomness for wpa_supplicant and sshd (urandom until 3.16).
 rc-service seedrng restart || rc-service urandom restart
 
-# Setup USB gadget ports if some ports are enabled in peripheral mode.
-# Note: we assume dwc2/dwc3 is pre-loaded, we just check mode.
-gdgt_id=""
-find /sys/class/udc/*/is_a_peripheral -print0 2>/dev/null | \
-	xargs -0 cat 2>/dev/null | grep -q "0" && \
-		_setup_gadget
-
 # Determine ovl file location.
 # Grab used ovl filename from dmesg.
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
@@ -371,6 +397,13 @@ else
 	ovlpath=$( find /media -maxdepth 2 -type d -path '*/.*' -prune -o -type f -name "${ovl}" -exec dirname {} \; | head -1 )
 	ovl="${ovlpath}/${ovl}"
 fi
+
+# Setup USB gadget ports if some ports are enabled in peripheral mode.
+# Note: we assume dwc2/dwc3 is pre-loaded, we just check mode.
+gdgt_id=""
+find /sys/class/udc/*/is_a_peripheral -print0 2>/dev/null | \
+	xargs -0 cat 2>/dev/null | grep -q "0" && \
+		_setup_gadget
 
 # Create banner file.
 warn=""

@@ -25,6 +25,7 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 - `interfaces`[^3] (*optional*): define network interfaces at will, if defaults DCHP-based are not suitable.
 - `authorized_keys` (*optional*): provide client's public SSH key to secure `root` ssh login.
 - `ssh_host_*_key*` (*optional*): provide server's custom ssh keys to be injected (may be stored), instead of using bundled ones[^2] (not stored). Providing an empty key file will trigger new keys generation (ssh server may take longer to start).
+- `gadget_type` (*optional*): specify USB gadget driver type (`g_cdc` for Linux/macOS compatibility, `g_ether` for Windows compatibility). Defaults to `g_cdc`.
 - `opt-out` (*optional*): dummy file to opt-out internet features (connection status, version check, auto-update) and related links usage anonymous [telemetry](https://is.gd/privacy.php).
 - `auto-updt` (*optional*): allow apkovl file automatic update with latest from master branch. If it contains *reboot* keyword all in one line, system will reboot after succesful update (unless ssh session is active or `unattended.sh` script is available).
 
