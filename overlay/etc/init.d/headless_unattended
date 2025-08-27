@@ -1,6 +1,6 @@
 #!/sbin/openrc-run
 
-# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
 description="Headless unattended setup script (optional)"

@@ -1,0 +1,4 @@
+[submodule "xg_multi"]
+	path = xg_multi
+	url = ../xg_multi
+	branch = main

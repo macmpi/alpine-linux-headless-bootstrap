@@ -1,6 +1,6 @@
 #!/bin/busybox sh
 
-# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
 # Script meant to be run on Alpine (busybox) or on Ubuntu.
@@ -18,6 +18,7 @@ if [ -n "$build_path" ]; then
 	# prefer timestamp option for touch as it works on directories too
 	t_stamp="$( TZ=UTC date +%Y%m%d0000.00 )"
 	cp -a overlay "$build_path"/.
+	cp xg_multi/xg_multi "$build_path"/overlay/usr/local/bin/.
 	find "$build_path"/overlay/ -exec sh -c 'TZ=UTC touch -chm -t "$0" "$1"' "$t_stamp" {} \;
 	# setting modes and owner/groups for runtime (won't affect mtime)
 	find "$build_path"/overlay/etc -type d -exec chmod 755 {} \;

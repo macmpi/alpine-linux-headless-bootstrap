@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# SPDX-FileCopyrightText: Copyright 2022-2023, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
 ## collection of few code snippets as sample unnatteded actions some may find usefull
