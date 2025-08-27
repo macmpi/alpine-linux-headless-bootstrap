@@ -35,8 +35,11 @@ _preserve() {
 _restore() {
 # Remove element (file, folder, symlink) and replace by
 # previous back-up if available.
+# shellcheck disable=SC2317  # known special case
 	[ -z "${1}" ] && return 1
+# shellcheck disable=SC2317  # known special case
 	rm -rf "${1}"
+# shellcheck disable=SC2317  # known special case
 	[ -e "${1}".orig ] && mv -f "${1}".orig "${1}"
 }
 
@@ -62,11 +65,11 @@ cat <<-EOF >>/tmp/.trash/headless_cleanup
 	_apk del wpa_supplicant
 	_restore "/etc/network/interfaces"
 	_restore "/etc/hostname"
-	rm -f /etc/modprobe.d/headless_gadget.conf
 
 	# Remove from boot service to avoid spurious openrc recalls from unattended script.
 	rm -f /etc/runlevels/default/headless_bootstrap
 	rm -f /usr/local/bin/headless_bootstrap
+	rm -f /usr/local/bin/xg_multi
 
 	# Run unattended script if available.
 	install -m755 ${ovlpath}/unattended.sh /tmp/headless_unattended >/dev/null 2>&1 && \
@@ -76,11 +79,11 @@ cat <<-EOF >>/tmp/.trash/headless_cleanup
 	rm -f /etc/init.d/headless_*
 	_logger "Clean-up done, enjoy !"
 	cat /tmp/.trash/banner >/dev/console
-	if [ -c /dev/ttyGS${gdgt_id} ]; then
+	if [ -c /dev/ttyGS0 ]; then
 		# Enabling terminal login into valid serial port:
 		# no choice than making permanent change to /etc/securetty (Alpine 3.19 already has ttyGS0).
-		grep -q "ttyGS${gdgt_id}" /etc/securetty || echo "ttyGS${gdgt_id}" >>/etc/securetty
-		/sbin/getty -L 115200 /dev/ttyGS${gdgt_id} vt100 &
+		grep -q "ttyGS0" /etc/securetty || echo "ttyGS0" >>/etc/securetty
+		/sbin/getty -L 115200 /dev/ttyGS0 vt100 &
 	fi
 	exit 0
 	EOF
@@ -122,9 +125,10 @@ fi
 # Define sshd-session & al files new location into sshd_config
 for f in /tmp/.trash/ssh/sshd-*; do
 	[ -e "$f" ] || continue # protect failing glob
-	name=$(echo $(basename $f) | cut -c6-)
-	initial=$(echo $name | cut -c1 | tr [a-z] [A-Z])
-	final=$(echo $name | cut -c2-)
+	name=$(basename "$f" | cut -c6-)
+	# shellcheck disable=SC2018,SC2019
+	initial=$(echo "$name" | cut -c1 | tr 'a-z' 'A-Z')
+	final=$(echo "$name" | cut -c2-)
 	echo "Sshd${initial}${final}Path $f" >>/etc/ssh/sshd_config
 done
 
@@ -262,7 +266,7 @@ if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>
 				# According to below we could rely on DEVTYPE for wlan devices
 				# https://lists.freedesktop.org/archives/systemd-devel/2014-January/015999.html
 				# but...some wlan might still be ill-behaved: use wlan_lst
-				# shellcheck disable=SC2169  # ash does support string replacement.
+				# shellcheck disable=SC3060  # ash does support string replacement.
 				_has_wifi && ! [ "${wlan_lst/$INTERFACE/}" = "$wlan_lst" ] && \
 					cat <<-EOF >>/etc/network/interfaces
 						auto $INTERFACE
@@ -271,7 +275,7 @@ if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>
 						EOF
 				# Ensure considered gadget interface is actually the connected one (may have several).
 				[ "$DEVTYPE" = "gadget" ] && \
-					find /sys/class/udc/*/device/gadget."${gdgt_id}"/net/"$INTERFACE" -maxdepth 0 >/dev/null 2>&1 && \
+					grep -vwq "0" /sys/class/net/"$INTERFACE"/carrier_up_count && \
 							cat <<-EOF >>/etc/network/interfaces && cat <<-EOF >/etc/resolv.conf
 								auto $INTERFACE
 								iface $INTERFACE inet static
@@ -310,37 +314,7 @@ hostname -F /etc/hostname
 rc-service networking restart
 }
 
-_setup_gadget() {
-## Load composite USB Serial/USB Ethernel driver & setup terminal.
-_logger "Enabling USB-gadget Serial and Ethernet ports"
-# Remove conflicting modules in case they were initially loaded (cmdline.txt).
-modprobe -r g_serial g_ether g_cdc
-modprobe g_cdc
-# Wait for g_cdc to settle and serial ports become available
-timeout 1 sh <<-EOF
-	while ! grep -q "ttyGS" /proc/devices; do sleep 0.2; done
-	EOF
 
-# Determine which gadget ID is connected with USB cable (assume just one max).
-# (setting console to unconnected serial port would block boot)
-gdgt_id="$( find /sys/class/udc/*/current_speed -exec \
-	sh -c 'grep -vq "UNKNOWN" "$0" && find ${0/current_speed/}device/gadget.* -maxdepth 0' {} \; \
-		| sed 's/\/.*gadget\.//' )"
-if [ -c /dev/ttyGS"${gdgt_id}" ]; then
-	# Default serial config: xon/xoff flow control.
-	stty -F /dev/ttyGS"${gdgt_id}"
-	setconsole /dev/ttyGS"${gdgt_id}"
-	# Notes to users willing to connect from Linux Ubuntu-based host terminal:
-	# - user on host needs to be part of dialout group (reboot required), and
-	# - disable spurious AT commands from ModemManager on host-side Gadget serial port
-	# one may create a /etc/udev/rules.d/99-ttyacms-gadget.rules as per:
-	# https://linux-tips.com/t/prevent-modem-manager-to-capture-usb-serial-devices/284/2
-	# ATTRS{idVendor}=="0525" ATTRS{idProduct}=="a4aa", ENV{ID_MM_DEVICE_IGNORE}="1"
-else
-	_logger "USB-gadget port not connected !"
-	modprobe -r g_cdc
-fi
-}
 
 
 #############################################################################
@@ -352,13 +326,6 @@ _logger "Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi"
 
 # Help randomness for wpa_supplicant and sshd (urandom until 3.16).
 rc-service seedrng restart || rc-service urandom restart
-
-# Setup USB gadget ports if some ports are enabled in peripheral mode.
-# Note: we assume dwc2/dwc3 is pre-loaded, we just check mode.
-gdgt_id=""
-find /sys/class/udc/*/is_a_peripheral -print0 2>/dev/null | \
-	xargs -0 cat 2>/dev/null | grep -q "0" && \
-		_setup_gadget
 
 # Determine ovl file location.
 # Grab used ovl filename from dmesg.
@@ -372,6 +339,22 @@ else
 	ovl="${ovlpath}/${ovl}"
 fi
 
+## Setup USB gadget ports if any connected
+/usr/local/bin/xg_multi -V "$( df | grep "$ovlpath" | awk '{print $1}' )" >/dev/null 2>&1
+# Setting console to connected serial port when available
+if [ -c /dev/ttyGS0 ]; then
+	# Default serial config: xon/xoff flow control.
+	stty -F /dev/ttyGS0
+	setconsole /dev/ttyGS0
+	# Notes to users willing to connect from Linux Ubuntu-based host terminal:
+	# - user on host needs to be part of dialout group (reboot required), and
+	# - disable spurious AT commands from ModemManager on host-side gadget serial port
+	# one may create a /etc/udev/rules.d/99-ttyacms-gadget.rules as per:
+	# https://linux-tips.com/t/prevent-modem-manager-to-capture-usb-serial-devices/284/2
+	# ATTRS{idVendor}=="1d6b" ATTRS{idProduct}=="0104", ENV{ID_MM_DEVICE_IGNORE}="1"
+fi
+
+
 # Create banner file.
 warn=""
 grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; is_ro=$?
@@ -381,7 +364,7 @@ _is_ro && warn="(remount partition rw!)"
 cat <<-EOF >/tmp/.trash/banner
 
 	Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi
-	
+
 	You may want to delete/rename .apkovl file before reboot ${warn}:
 	${ovl}
 	(can be done automatically with unattended script - see sample snippet)
