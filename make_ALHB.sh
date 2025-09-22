@@ -18,17 +18,19 @@ if [ -n "$build_path" ]; then
 	# prefer timestamp option for touch as it works on directories too
 	t_stamp="$( TZ=UTC date +%Y%m%d0000.00 )"
 	cp -a overlay "$build_path"/.
-	cp xg_multi/xg_multi "$build_path"/overlay/usr/local/bin/.
+	cp -a LICENSE "$build_path"/overlay/tmp/ALHB_LICENSE
+	cp -a xg_multi/xg_multi "$build_path"/overlay/tmp/.ALHB/.
 	find "$build_path"/overlay/ -exec sh -c 'TZ=UTC touch -chm -t "$0" "$1"' "$t_stamp" {} \;
 	# setting modes and owner/groups for runtime (won't affect mtime)
 	find "$build_path"/overlay/etc -type d -exec chmod 755 {} \;
 	chmod 755 "$build_path"/overlay/etc/init.d/*
 	chmod 755 "$build_path"/overlay/etc/runlevels/default/*
 	chmod 777 "$build_path"/overlay/tmp
-	chmod 700 "$build_path"/overlay/tmp/.trash
-	chmod -R 600 "$build_path"/overlay/tmp/.trash/ssh_host_*_key
-	find "$build_path"/overlay/usr -type d -exec chmod 755 {} \;
-	chmod 755 "$build_path"/overlay/usr/local/bin/*
+	chmod 644 "$build_path"/overlay/tmp/ALHB_LICENSE
+	chmod 700 "$build_path"/overlay/tmp/.ALHB
+	chmod 755 "$build_path"/overlay/tmp/.ALHB/*
+	chmod 600 "$build_path"/overlay/tmp/.ALHB/ssh_host_*_key
+	chmod 644 "$build_path"/overlay/tmp/.ALHB/ssh_host_*_key.pub
 	doas chown -Rh 0:0 "$build_path"/overlay/*
 
 	# busybox config on Alpine & Ubuntu has FEATURE_TAR_GNU_EXTENSIONS
