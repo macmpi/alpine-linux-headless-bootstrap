@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
-HDLSBSTRP_VERSION="1.3"
+ALHB_VERSION="1.4"
 
 _apk() {
 	local cmd="$1"
@@ -12,12 +12,12 @@ _apk() {
 	case $cmd in
 		add) # install only if not already present
 			if ! apk info | grep -wq "${pkg}"; then
-				apk add "$pkg" && printf '%s ' "${pkg}" >>/tmp/.trash/installed
+				apk add "$pkg" && printf '%s ' "${pkg}" >>/tmp/.ALHB/installed
 			fi
 		;;
 		del) # delete only if previously installed
-			if grep -wq "$pkg" /tmp/.trash/installed >/dev/null 2>&1; then
-				apk del "$pkg" && sed -i 's/\b'"${pkg}"'\b//' /tmp/.trash/installed
+			if grep -wq "$pkg" /tmp/.ALHB/installed >/dev/null 2>&1; then
+				apk del "$pkg" && sed -i 's/\b'"${pkg}"'\b//' /tmp/.ALHB/installed
 			fi
 		;;
 		*)
@@ -52,8 +52,8 @@ _prep_cleanup() {
 ## Prep for final headless_cleanup:
 # clears any installed packages and settings.
 # Copy begininng of this file to keep functions.
-sed -n '/^#* End .*alter!)$/q;p' /usr/local/bin/headless_bootstrap >/tmp/.trash/headless_cleanup
-cat <<-EOF >>/tmp/.trash/headless_cleanup
+sed -n '/^#* End .*alter!)$/q;p' /tmp/.ALHB/headless_bootstrap >/tmp/.ALHB/headless_cleanup
+cat <<-EOF >>/tmp/.ALHB/headless_cleanup
 	# Redirect stdout and errors to console as service won't show messages
 	exec 1>/dev/console 2>&1
 
@@ -68,17 +68,29 @@ cat <<-EOF >>/tmp/.trash/headless_cleanup
 
 	# Remove from boot service to avoid spurious openrc recalls from unattended script.
 	rm -f /etc/runlevels/default/headless_bootstrap
-	rm -f /usr/local/bin/headless_bootstrap
-	rm -f /usr/local/bin/xg_multi
 
 	# Run unattended script if available.
-	install -m755 ${ovlpath}/unattended.sh /tmp/headless_unattended >/dev/null 2>&1 && \
-		_logger "Starting headless_unattended service" && \
-		rc-service headless_unattended start
+	if install -m755 ${ovlpath}/unattended.sh /tmp/headless_unattended >/dev/null 2>&1; then
+		cat <<-EOF1 >/etc/init.d/headless_unattended
+			#!/sbin/openrc-run
 
+			# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
+			# SPDX-License-Identifier: MIT
+
+			description="Headless unattended setup script (optional)"
+			name="Headless unattended"
+
+			command="/tmp/headless_unattended"
+			command_background=true
+			pidfile="/run/headless_unattended.pid"
+			EOF1
+		chmod +x /etc/init.d/headless_unattended
+		_logger "Starting headless_unattended service"
+		rc-service headless_unattended start
+	fi
 	rm -f /etc/init.d/headless_*
 	_logger "Clean-up done, enjoy !"
-	cat /tmp/.trash/banner >/dev/console
+	cat /tmp/.ALHB/banner >/dev/console
 	if [ -c /dev/ttyGS0 ]; then
 		# Enabling terminal login into valid serial port:
 		# no choice than making permanent change to /etc/securetty (Alpine 3.19 already has ttyGS0).
@@ -87,7 +99,22 @@ cat <<-EOF >>/tmp/.trash/headless_cleanup
 	fi
 	exit 0
 	EOF
-chmod +x /tmp/.trash/headless_cleanup
+chmod +x /tmp/.ALHB/headless_cleanup
+
+cat <<-EOF >/etc/init.d/headless_cleanup
+	#!/sbin/openrc-run
+
+	# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
+	# SPDX-License-Identifier: MIT
+
+	description="Headless cleanup script"
+	name="Headless cleanup"
+
+	command="/tmp/.ALHB/headless_cleanup"
+	command_background=true
+	pidfile="/run/headless_cleanup.pid"
+	EOF
+chmod +x /etc/init.d/headless_cleanup
 }
 
 _setup_sshd() {
@@ -95,22 +122,22 @@ _setup_sshd() {
 # we use some bundled (or optionaly provided) keys to avoid generation at startup and save time.
 _apk add openssh-server
 # Preserve sshd-session & al binaries before uninstall
-[ -d /usr/lib/ssh ] && cp -a /usr/lib/ssh /tmp/.trash/.
+[ -d /usr/lib/ssh ] && cp -a /usr/lib/ssh /tmp/.ALHB/.
 
 _preserve "/etc/ssh/sshd_config"
 _preserve "/etc/conf.d/sshd"
 
 cat <<-EOF >/etc/ssh/sshd_config
 	PermitRootLogin yes
-	Banner /tmp/.trash/banner
+	Banner /tmp/.ALHB/banner
 	EOF
 
 # Client authorized_keys or no authentication.
-if install -m600 "${ovlpath}"/authorized_keys /tmp/.trash/authorized_keys >/dev/null 2>&1; then
+if install -m600 "${ovlpath}"/authorized_keys /tmp/.ALHB/authorized_keys >/dev/null 2>&1; then
 	_logger "Enabling public key SSH authentication..."
 	cat <<-EOF >>/etc/ssh/sshd_config
 		AuthenticationMethods publickey
-		AuthorizedKeysFile /tmp/.trash/authorized_keys
+		AuthorizedKeysFile /tmp/.ALHB/authorized_keys
 		# relax strict mode as authorized_keys are inside /tmp
 		StrictModes no
 		EOF
@@ -123,7 +150,7 @@ else
 fi
 
 # Define sshd-session & al files new location into sshd_config
-for f in /tmp/.trash/ssh/sshd-*; do
+for f in /tmp/.ALHB/ssh/sshd-*; do
 	[ -e "$f" ] || continue # protect failing glob
 	name=$(basename "$f" | cut -c6-)
 	# shellcheck disable=SC2018,SC2019
@@ -148,8 +175,8 @@ if install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/ >/dev/null 2>&1; then
 else
 	_logger "Using bundled ssh keys from RAM..."
 	cat <<-EOF >>/etc/ssh/sshd_config
-		HostKey /tmp/.trash/ssh_host_ed25519_key
-		HostKey /tmp/.trash/ssh_host_rsa_key
+		HostKey /tmp/.ALHB/ssh_host_ed25519_key
+		HostKey /tmp/.ALHB/ssh_host_rsa_key
 		EOF
 fi
 
@@ -182,9 +209,9 @@ _is_ro && mount -o remount,ro "${ovlpath}"
 _logger "Update $updt_status"
 
 if [ "$updt_status" = "successful" ]; then
-	printf '%s\n\n' "Updated (Read release notes!)" >>/tmp/.trash/banner
+	printf '%s\n\n' "Updated (Read release notes!)" >>/tmp/.ALHB/banner
 else
-	printf '\n' >>/tmp/.trash/banner
+	printf '\n' >>/tmp/.ALHB/banner
 	return 1
 fi
 # Reboot if specified in auto-updt file (and no ssh session ongoing nor unattended.sh script available).
@@ -208,17 +235,17 @@ if wget -q -O /tmp/homepg -T 10 --no-check-certificate "$url" >/dev/null 2>&1; t
 	_logger "Internet access: success"
 	vers="$( grep -o "$ref.*\"" /tmp/homepg | grep -Eo '[0-9]+[\.[0-9]+]*' )"
 	rm -f /tmp/homepg
-	if [ -n "$vers" ] && ! [ "$vers" = "$HDLSBSTRP_VERSION" ]; then
+	if [ -n "$vers" ] && ! [ "$vers" = "$ALHB_VERSION" ]; then
 		vers="!! Version $vers is available on Github project page !!"
 		_logger "$vers"
-		printf '%s\n' "$vers" >>/tmp/.trash/banner
+		printf '%s\n' "$vers" >>/tmp/.ALHB/banner
 		# Optionally update apkovl if key-file allows it.
 		if [ -f "${ovlpath}"/auto-updt ]; then
 			_logger "Updating overlay file..."
 			_updt_apkovl &
 		else
 			_logger "(check doc to enable auto-update)"
-			printf '%s\n\n' "(check doc to enable auto-update)" >>/tmp/.trash/banner
+			printf '%s\n\n' "(check doc to enable auto-update)" >>/tmp/.ALHB/banner
 		fi
 	fi
 else
@@ -276,17 +303,17 @@ if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>
 				# Ensure considered gadget interface is actually the connected one (may have several).
 				[ "$DEVTYPE" = "gadget" ] && \
 					grep -vwq "0" /sys/class/net/"$INTERFACE"/carrier_up_count && \
-							cat <<-EOF >>/etc/network/interfaces && cat <<-EOF >/etc/resolv.conf
+							cat <<-EOF1 >>/etc/network/interfaces && cat <<-EOF2 >/etc/resolv.conf
 								auto $INTERFACE
 								iface $INTERFACE inet static
 								    address 10.42.0.2/24
 								    gateway 10.42.0.1
 
-								EOF
+								EOF1
 								nameserver 9.9.9.9
 								nameserver 149.112.112.112
 
-								EOF
+								EOF2
 				;;
 		esac
 	done
@@ -322,7 +349,7 @@ rc-service networking restart
 
 # Redirect stdout and errors to console as service won't show messages
 exec 1>/dev/console 2>&1
-_logger "Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi"
+_logger "Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi"
 
 # Help randomness for wpa_supplicant and sshd (urandom until 3.16).
 rc-service seedrng restart || rc-service urandom restart
@@ -340,18 +367,12 @@ else
 fi
 
 ## Setup USB gadget ports if any connected
-/usr/local/bin/xg_multi -V "$( df | grep "$ovlpath" | awk '{print $1}' )" >/dev/null 2>&1
+/tmp/.ALHB/xg_multi -V "$( df | grep "$ovlpath" | awk '{print $1}' )" >/dev/null 2>&1
 # Setting console to connected serial port when available
 if [ -c /dev/ttyGS0 ]; then
 	# Default serial config: xon/xoff flow control.
 	stty -F /dev/ttyGS0
 	setconsole /dev/ttyGS0
-	# Notes to users willing to connect from Linux Ubuntu-based host terminal:
-	# - user on host needs to be part of dialout group (reboot required), and
-	# - disable spurious AT commands from ModemManager on host-side gadget serial port
-	# one may create a /etc/udev/rules.d/99-ttyacms-gadget.rules as per:
-	# https://linux-tips.com/t/prevent-modem-manager-to-capture-usb-serial-devices/284/2
-	# ATTRS{idVendor}=="1d6b" ATTRS{idProduct}=="0104", ENV{ID_MM_DEVICE_IGNORE}="1"
 fi
 
 
@@ -361,9 +382,9 @@ grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; is_ro=$?
 _is_ro() { return "$is_ro"; }
 
 _is_ro && warn="(remount partition rw!)"
-cat <<-EOF >/tmp/.trash/banner
+cat <<-EOF >/tmp/.ALHB/banner
 
-	Alpine Linux headless bootstrap v$HDLSBSTRP_VERSION by macmpi
+	Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi
 
 	You may want to delete/rename .apkovl file before reboot ${warn}:
 	${ovl}
