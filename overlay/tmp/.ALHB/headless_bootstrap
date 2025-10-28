@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.4"
+ALHB_VERSION="1.5"
 
 _apk() {
 	local cmd="$1"
@@ -70,21 +70,7 @@ cat <<-EOF >>/tmp/.ALHB/headless_cleanup
 	rm -f /etc/runlevels/default/headless_bootstrap
 
 	# Run unattended script if available.
-	if install -m755 ${ovlpath}/unattended.sh /tmp/headless_unattended >/dev/null 2>&1; then
-		cat <<-EOF1 >/etc/init.d/headless_unattended
-			#!/sbin/openrc-run
-
-			# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
-			# SPDX-License-Identifier: MIT
-
-			description="Headless unattended setup script (optional)"
-			name="Headless unattended"
-
-			command="/tmp/headless_unattended"
-			command_background=true
-			pidfile="/run/headless_unattended.pid"
-			EOF1
-		chmod +x /etc/init.d/headless_unattended
+	if [ -f /tmp/headless_unattended ]; then
 		_logger "Starting headless_unattended service"
 		rc-service headless_unattended start
 	fi
@@ -100,7 +86,6 @@ cat <<-EOF >>/tmp/.ALHB/headless_cleanup
 	exit 0
 	EOF
 chmod +x /tmp/.ALHB/headless_cleanup
-
 cat <<-EOF >/etc/init.d/headless_cleanup
 	#!/sbin/openrc-run
 
@@ -115,6 +100,26 @@ cat <<-EOF >/etc/init.d/headless_cleanup
 	pidfile="/run/headless_cleanup.pid"
 	EOF
 chmod +x /etc/init.d/headless_cleanup
+
+if install -m755 ${ovlpath}/unattended.sh /tmp/headless_unattended >/dev/null 2>&1; then
+	cat <<-EOF >/etc/init.d/headless_unattended
+		#!/sbin/openrc-run
+
+		# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
+		# SPDX-License-Identifier: MIT
+
+		description="Headless unattended setup script (optional)"
+		name="Headless unattended"
+
+		command="/tmp/headless_unattended"
+		command_background=true
+		pidfile="/run/headless_unattended.pid"
+		EOF
+	chmod +x /etc/init.d/headless_unattended
+fi
+
+# force service dependency tree update
+rc-update --update
 }
 
 _setup_sshd() {
@@ -190,9 +195,9 @@ _updt_apkovl() {
 # URL redirects to apkovl file on github master: is.gd shortener provides basic analytics.
 # Analytics are public and can be checked at https://is.gd/stats.php?url=apkovl_master
 # Privacy policy: https://is.gd/privacy.php
-local file_url="https://is.gd/apkovl_master"
-local sha_url="https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz.sha512"
 local updt_status="failed, keeping original version"
+local sha_url="https://github.com/macmpi/alpine-linux-headless-bootstrap/raw/main/headless.apkovl.tar.gz.sha512"
+local file_url="https://is.gd/apkovl_master"
 
 # Ensure system date is correct to allow SSL transactions
 ntpd -N -p pool.ntp.org -n -q
@@ -216,7 +221,7 @@ else
 fi
 # Reboot if specified in auto-updt file (and no ssh session ongoing nor unattended.sh script available).
 ! pgrep -a -P "$( cat /run/sshd.pid 2>/dev/null )" 2>/dev/null | grep -q "sshd: root@pts" && \
-	! [ -f "${ovlpath}"/unattended.sh ] && \
+	! [ -f /tmp/headless_unattended ] && \
 		grep -q "^reboot$" "${ovlpath}"/auto-updt && \
 			_logger "Will reboot in 3sec..." && sleep 3 && reboot
 exit 0
@@ -351,9 +356,6 @@ rc-service networking restart
 exec 1>/dev/console 2>&1
 _logger "Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi"
 
-# Help randomness for wpa_supplicant and sshd (urandom until 3.16).
-rc-service seedrng restart || rc-service urandom restart
-
 # Determine ovl file location.
 # Grab used ovl filename from dmesg.
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
@@ -375,12 +377,17 @@ if [ -c /dev/ttyGS0 ]; then
 	setconsole /dev/ttyGS0
 fi
 
+_prep_cleanup
 
-# Create banner file.
-warn=""
+# Help randomness for wpa_supplicant and sshd (urandom until 3.16).
+rc-service seedrng restart || rc-service urandom restart
+
+# Detect apkovl volume ro/rw state
 grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; is_ro=$?
 _is_ro() { return "$is_ro"; }
 
+# Create banner file.
+warn=""
 _is_ro && warn="(remount partition rw!)"
 cat <<-EOF >/tmp/.ALHB/banner
 
@@ -400,10 +407,9 @@ _setup_networking
 [ -f "${ovlpath}"/opt-out ] || _tst_version &
 
 # Setup sshd unless unattended.sh script prevents it.
-grep -q "^#NO_SSH$" "${ovlpath}"/unattended.sh >/dev/null 2>&1 \
+grep -q "^#NO_SSH$" /tmp/headless_unattended >/dev/null 2>&1 \
 	|| _setup_sshd
 
-_prep_cleanup
 _logger "Initial setup done, handing-over to clean-up"
 rc-service headless_cleanup start
 exit 0
