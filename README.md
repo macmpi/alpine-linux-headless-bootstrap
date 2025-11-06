@@ -30,8 +30,8 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 
 Main execution steps are logged: `cat /var/log/messages | grep headless`.
 
-## Goody:
-Seamless USB-gadget mode on capable devices (*e.g. on PiZero*): serial console, ethernet and mass-storage
+## Goody for *OTG-peripheral* capable devices:
+Seamless USB-gadget mode on *OTG-peripheral* capable devices (*e.g. on PiZero*): serial console, ethernet and mass-storage
 - Make sure `dwc2` (or `dwc3`) driver is previously loaded on capable device, and configuration is set to **OTG peripheral** mode: this may be driven by hardware (including cable) and/or software.\
 (on supporting Pi devices, just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` (or `config.txt`) to force both by software)
 - Plug USB cable into host Computer port before booting device.
