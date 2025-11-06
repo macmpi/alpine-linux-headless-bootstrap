@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.5"
+ALHB_VERSION="1.6"
 
 _apk() {
 	local cmd="$1"
@@ -263,6 +263,13 @@ _setup_networking() {
 local has_wifi wlan_lst
 _has_wifi() { return "$has_wifi"; }
 
+# workaround some brcmfmac issues with wpa_supplicant (not Pi only issue)
+# https://github.com/RPi-Distro/firmware-nonfree/commit/2788cb549a19bf2e77901c4071ef88c2ad683b7c
+if lsmod | grep -q brcmfmac; then
+	rmmod brcmfmac && modprobe brcmfmac roamoff=1 feature_disable=0x282000
+	_logger "Applied brcmfmac workaround for wpa_supplicant"
+fi
+
 wlan_lst="$( find /sys/class/net/*/phy80211 -exec \
 	sh -c 'printf %s\| "$( basename "$( dirname "$0" )" )"' {} \; 2>/dev/null )"
 wlan_lst="${wlan_lst%\|}"
@@ -315,8 +322,8 @@ if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>
 								    gateway 10.42.0.1
 
 								EOF1
-								nameserver 9.9.9.9
-								nameserver 149.112.112.112
+								nameserver 1.1.1.1
+								nameserver 1.0.0.1
 
 								EOF2
 				;;
