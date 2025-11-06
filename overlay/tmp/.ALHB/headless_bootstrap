@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.5"
+ALHB_VERSION="1.6"
 
 _apk() {
 	local cmd="$1"

@@ -30,11 +30,13 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 
 Main execution steps are logged: `cat /var/log/messages | grep headless`.
 
-## Goody for *OTG-peripheral* capable devices:
-Seamless USB-gadget mode on *OTG-peripheral* capable devices (*e.g. on PiZero*): serial console, ethernet and mass-storage
-- Make sure `dwc2` (or `dwc3`) driver is previously loaded on capable device, and configuration is set to **OTG peripheral** mode: this may be driven by hardware (including cable) and/or software.\
-(on supporting Pi devices, just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` (or `config.txt`) to force both by software)
-- Plug USB cable into host Computer port before booting device.
+## Seamless USB-gadget mode on *OTG-peripheral* capable devices:
+Devices with UDC controller (*e.g. PiZero*) may expose the following features over USB port: serial console, ethernet interface and mass-storage
+
+To enable them, just make sure `dwc2` (or `dwc3`) driver is previously loaded on capable device, and configuration is set to **OTG peripheral** mode: this may be driven by hardware (including cable) and/or software.\
+(on supporting Pi devices[^5], just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` to force both by software)
+
+Plug USB cable into host Computer port before booting device.
   - serial terminal can then be connected-to from host Computer (e.g. `cu -l ttyACM0` on Linux. xon/xoff flow control).
   - alternatively, with host Computer ECM/RNDIS interface set-up as `10.42.0.1` (sharing internet or not), one can log into device from host with: `ssh root@10.42.0.2`.
   - volume containing `headless.apkovl.tar.gz` file may be accessed/mounted from host, and config files easily edited. Make sure to unmount properly before removing USB plug.
@@ -57,3 +59,4 @@ Thanks for the initial guides & scripts from @sodface and @davidmytton.
 [^2]: Temporarily remove `root=*` statement from kernel command-line parameters list to disable disk-based boot mode.
 [^3]: These files are linux text files: Windows/macOS users need to use text editors supporting linux text line-ending (such as [notepad++](https://notepad-plus-plus.org/), BBEdit or any similar).
 [^4]: About temporarily bundled ssh keys: this overlay is meant to **quickly bootstrap** system in order to then proceed with proper install; therefore it purposely embeds [some ssh keys](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/tmp/.ALHB) so that bootstrapping is as fast as possible. Those temporary keys are in RAM `/tmp`: they **are discarded** once actual system install is rebooted (whether or not ssh server is installed in final setup).
+[^5]: OTG capable Pi devices include Zero serie/A/A+/3A+/4B/400/5/500/Compute-Modules
