@@ -322,8 +322,8 @@ if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>
 								    gateway 10.42.0.1
 
 								EOF1
-								nameserver 9.9.9.9
-								nameserver 149.112.112.112
+								nameserver 1.1.1.1
+								nameserver 1.0.0.1
 
 								EOF2
 				;;
