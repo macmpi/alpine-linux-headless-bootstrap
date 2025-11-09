@@ -30,18 +30,18 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 
 Main execution steps are logged: `cat /var/log/messages | grep headless`.
 
-## Seamless USB-gadget mode on *OTG-peripheral* capable devices:
-Devices with UDC controller (*e.g. PiZero*) may expose the following features over USB port: serial console, ethernet interface and mass-storage
+## Seamless USB-gadget mode:
+Devices with UDC controller (*e.g., PiZero*) can expose the following features over USB port: serial console, ethernet interface and mass-storage
 
-To enable them, just make sure `dwc2` (or `dwc3`) driver is previously loaded on capable device, and configuration is set to **OTG peripheral** mode: this may be driven by hardware (including cable) and/or software.\
-(on supporting Pi devices[^5], just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` to force both by software)
+To enable them, make sure `dwc2` (or `dwc3`) driver is **previously loaded** on capable device, **and** configuration is set to **OTG peripheral** mode: depending on devices, this may be driven by hardware (including cable) and/or software.\
+(e.g., on supporting Pi devices[^5], just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` to force both by software)
 
 Plug USB cable into host Computer port before booting device.
-  - serial terminal can then be connected-to from host Computer (e.g. `cu -l ttyACM0` on Linux. xon/xoff flow control).
+  - serial terminal can then be connected-to from host Computer (e.g. `cu -l ttyACM0` on Linux. *115200 baud, xon/xoff flow control*).
   - alternatively, with host Computer ECM/RNDIS interface set-up as `10.42.0.1` (sharing internet or not), one can log into device from host with: `ssh root@10.42.0.2`.
-  - volume containing `headless.apkovl.tar.gz` file may be accessed/mounted from host, and config files easily edited. Make sure to unmount properly before removing USB plug.
+  - volume containing `headless.apkovl.tar.gz` file may be accessed/mounted from host, and config files easily edited. Make sure to unmount properly from host before shutting-down device and removing USB plug.
 
-_Note:_ optionally, same USB-gadget feature may be easily enabled on final system by installing `xg_multi` Alpine [package](https://pkgs.alpinelinux.org/packages?name=xg_multi&branch=edge&repo=&arch=&origin=&flagged=&maintainer=) and service during system setup phase (refer to [`xg_multi`](https://github.com/macmpi/xg_multi/) project).
+_Note:_ optionally, same USB-gadget feature may be easily enabled on final system by installing `xg_multi` Alpine [package](https://pkgs.alpinelinux.org/packages?name=xg_multi&branch=edge&repo=&arch=&origin=&flagged=&maintainer=) and service during system setup phase (refer to [`xg_multi`](https://github.com/macmpi/xg_multi/) project for details).
 
 ##
 [![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/macmpi)
