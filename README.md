@@ -19,21 +19,22 @@ As with Alpine Linux initial bring-up, `root` account has no password initially.
 From there, actual system install can be performed as usual with `setup-alpine` for instance (check Alpine [wiki](https://wiki.alpinelinux.org/wiki/Alpine_setup_scripts#setup-alpine) for details).
 
 ## Extra configuration:
-Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapping configuration (check `sample_*` files):
+Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapping configuration (check [contribs](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/contribs) sample files):
 - `wpa_supplicant.conf`[^3] (*mandatory for wifi*): define wifi SSID, password and regulatory country [code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2).
-- `unattended.sh`[^3] (*optional*): provide a deployment script to automate setup & customizations during initial bootstrap *(check users' contributed [samples](https://github.com/macmpi/alpine-linux-headless-bootstrap/discussions/categories/unattended-sh-samples) and share yours)*.
+- `unattended.sh`[^3] (*optional*): provide a deployment script to automate setup & customizations during initial bootstrap *(see [contribs](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/contribs) or users' contributed [samples](https://github.com/macmpi/alpine-linux-headless-bootstrap/discussions/categories/unattended-sh-samples) and share yours)*.
 - `interfaces`[^3] (*optional*): define network interfaces at will, if defaults DCHP-based are not suitable.
 - `authorized_keys` (*optional*): provide client's public SSH key to secure `root` ssh login.
 - `ssh_host_*_key*` (*optional*): provide server's custom ssh keys to be injected (may be stored), instead of using temporarily bundled ones[^4] (not stored). Providing an empty key file will trigger new keys generation (ssh server may take longer to start).
 - `opt-out` (*optional*): dummy file to opt-out internet features (connection status, version check, auto-update) and related links usage anonymous [telemetry](https://is.gd/privacy.php).
 - `auto-updt` (*optional*): enable automatic `headless.apkovl.tar.gz` file update with latest from master branch. If it contains `reboot` keyword all in one line, system will reboot after succesful update (unless ssh session is active or `unattended.sh` script is available).
 
-Main execution steps are logged: `cat /var/log/messages | grep headless`.
+Main execution steps are logged: `cat /var/log/messages | grep headless`.\
+For more details: `cat /tmp/alhb`.
 
 ## Seamless USB-gadget mode:
-Devices with UDC controller (*e.g., PiZero*) can expose the following features over USB port: serial console, ethernet interface and mass-storage
+Devices with UDC controller (*e.g., PiZero*) can expose the following features over USB port: serial console, ethernet interface and mass-storage.
 
-To enable them, make sure `dwc2` (or `dwc3`) driver is **previously loaded** on capable device, **and** configuration is set to **OTG peripheral** mode: depending on devices, this may be driven by hardware (including cable) and/or software.\
+To enable them, make sure `dwc2` (or `dwc3`) driver is **previously loaded** on device, **and** configuration is set to **OTG peripheral** mode: depending on devices, this may be driven by hardware (including cable) and/or software.\
 (e.g., on supporting Pi devices[^5], just add `dtoverlay=dwc2,dr_mode=peripheral` in `usercfg.txt` to force both by software)
 
 Plug USB cable into host Computer port before booting device.
