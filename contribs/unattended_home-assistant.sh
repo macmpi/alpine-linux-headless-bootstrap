@@ -4,9 +4,10 @@
 # SPDX-License-Identifier: MIT
 
 ##  Install minimal sys-based Alpine with Home-assistant docker image (with tailscale and mosquitto)
+##  This script may be run onto any Alpine device (armhf/armv7/aarch64/x86/x86_64).
 ##  e.g., on 512MB PiZeroW (armhf), uses ~290MB RAM while running; leaves ~170MB RAM available
-##  PiZero2W should stick to 32bit (armv7) releases, as 512MB RAM is too tight for 64bit containers
 ##  Home-Assistant 32bit last release is 2025.11.3 
+##  With zram RAM compression, PiZero2W may run latest Home-Assistant releases on 64bit aarch64.
 
 # HOW TO USE (Customize MY_xxxx values to your needs. Defaults are ok for Pi)
 # - prepare install media (Alpine 3.23 and later) as per Alpine wiki for your target hardware
@@ -64,7 +65,7 @@ if [ -e "$ovlpath/wpa_supplicant.conf" ]; then
 	_logger "Wifi configured"
 fi
 
-_logger "Starting base sys disk installation"
+_logger "Starting base sys-disk installation"
 cat <<-EOF > /tmp/ANSWERFILE
 	KEYMAPOPTS=none
 	HOSTNAMEOPTS=home-assistant
@@ -105,6 +106,23 @@ cat <<-EOF1 >/tmp/setup_homeassistant.sh
 	if grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
 		apk add raspberrypi-bootloader-cutdown
 		echo "gpu_mem=16" >> /boot/config.txt
+
+		# Enable zram on PiZero2W devices (multicore CPU with only 512MB Ram)
+		# This allows to run latest 64-bit container images in particular
+		if grep -q "Raspberry Pi Zero 2 W" /proc/device-tree/model; then
+			# see https://wiki.alpinelinux.org/wiki/Zram
+			apk add zram-init
+			cat <<-EOF >/etc/conf.d/zram-init
+				# settings for 500M zram
+				load_on_start=yes
+				unload_on_stop=yes
+				num_devices=1
+				type0=swap
+				size0=512
+				algo0=zstd
+				EOF
+			rc-update add zram-init boot
+		fi
 	fi
 
 	apk add bluez
