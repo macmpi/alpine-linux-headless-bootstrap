@@ -1,6 +1,6 @@
 #!/sbin/openrc-run
 
-# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
 # SPDX-License-Identifier: MIT
 
 description="Headless main boostrappring script"
@@ -10,3 +10,10 @@ command="/tmp/.ALHB/headless_bootstrap"
 command_background=true
 pidfile="/run/${RC_SVCNAME}.pid"
 
+depend() {
+	use logger
+    want dev-settle
+    need localmount
+    before net agetty.ttyGS0
+    after bootmisc hwdrivers modules
+}

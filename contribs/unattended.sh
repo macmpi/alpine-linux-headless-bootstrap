@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
 # SPDX-License-Identifier: MIT
 
 ## collection of few code snippets as sample unnatteded actions some may find usefull
@@ -11,19 +11,19 @@
 # only keep a single starting # on the line below
 ##NO_SSH
 
-# Uncomment to enable stdout and errors redirection to console (service won't show messages)
-# exec 1>/dev/console 2>&1
+# Uncomment to redirect stdout and errors to logfile as service won't show messages
+# exec 1>>/tmp/alhb 2>&1
 
 # shellcheck disable=SC2142  # known special case
 alias _logger='logger -st "${0##*/}"'
+
 
 ## Obvious one; reminder: is run as background service
 _logger "hello world !!"
 sleep 60
 _logger "Finished script"
+
 ########################################################
-
-
 ## This snippet removes apkovl file on volume after initial boot
 # grab used ovl filename from dmesg
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
@@ -44,8 +44,6 @@ rm -f "${ovl}"
 _is_ro && mount -o remount,ro "${ovlpath}"
 
 ########################################################
-
-
 ## This snippet configures Minimal diskless environment
 # note: with INTERFACESOPTS=none, no networking will be setup so it won't work after reboot!
 # Change it or run setup-interfaces in interractive mode afterwards (and lbu commit -d thenafter)
@@ -68,7 +66,7 @@ cat <<-EOF > /tmp/ANSWERFILE
 	INTERFACESOPTS=none
 
 	# Set Public nameserver
-	DNSOPTS="-n 9.9.9.9"
+	DNSOPTS="-n 1.1.1.1"
 
 	# Set timezone to UTC
 	TIMEZONEOPTS="UTC"
@@ -77,7 +75,7 @@ cat <<-EOF > /tmp/ANSWERFILE
 	PROXYOPTS=none
 
 	# Add first mirror (CDN)
-	APKREPOSOPTS="-1"
+	APKREPOSOPTS="-1 -c"
 
 	# Do not create any user
 	USEROPTS=none

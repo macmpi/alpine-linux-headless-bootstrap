@@ -1,30 +1,12 @@
 #!/bin/sh
 
-# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
+# SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.6"
+ALHB_VERSION="1.7"
 
-_apk() {
-	local cmd="$1"
-	local pkg="$2"
-
-	case $cmd in
-		add) # install only if not already present
-			if ! apk info | grep -wq "${pkg}"; then
-				apk add "$pkg" && printf '%s ' "${pkg}" >>/tmp/.ALHB/installed
-			fi
-		;;
-		del) # delete only if previously installed
-			if grep -wq "$pkg" /tmp/.ALHB/installed >/dev/null 2>&1; then
-				apk del "$pkg" && sed -i 's/\b'"${pkg}"'\b//' /tmp/.ALHB/installed
-			fi
-		;;
-		*)
-			echo "only add/del: wrong usage"; exit
-		;;
-	esac
-}
+# https://github.com/RPi-Distro/firmware-nonfree/commit/e1e78b65b350c799cb7cac49713e21c79fcf993d
+BRCMFMAC_OPTS="roamoff=1 feature_disable=0x282000"
 
 _preserve() {
 # Create a back-up of element (file, folder, symlink).
@@ -46,86 +28,10 @@ _restore() {
 # shellcheck disable=SC2142  # known special case
 alias _logger='logger -st "${0##*/}"'
 
-##### End of part to be duplicated into headless_cleanup (do not alter!)
-
-_prep_cleanup() {
-## Prep for final headless_cleanup:
-# clears any installed packages and settings.
-# Copy begininng of this file to keep functions.
-sed -n '/^#* End .*alter!)$/q;p' /tmp/.ALHB/headless_bootstrap >/tmp/.ALHB/headless_cleanup
-cat <<-EOF >>/tmp/.ALHB/headless_cleanup
-	# Redirect stdout and errors to console as service won't show messages
-	exec 1>/dev/console 2>&1
-
-	_logger "Cleaning-up..."
-	_restore "/etc/ssh/sshd_config"
-	_restore "/etc/conf.d/sshd"
-	_apk del openssh-server
-	_restore "/etc/wpa_supplicant/wpa_supplicant.conf"
-	_apk del wpa_supplicant
-	_restore "/etc/network/interfaces"
-	_restore "/etc/hostname"
-
-	# Remove from boot service to avoid spurious openrc recalls from unattended script.
-	rm -f /etc/runlevels/default/headless_bootstrap
-
-	# Run unattended script if available.
-	if [ -f /tmp/headless_unattended ]; then
-		_logger "Starting headless_unattended service"
-		rc-service headless_unattended start
-	fi
-	rm -f /etc/init.d/headless_*
-	_logger "Clean-up done, enjoy !"
-	cat /tmp/.ALHB/banner >/dev/console
-	if [ -c /dev/ttyGS0 ]; then
-		# Enabling terminal login into valid serial port:
-		# no choice than making permanent change to /etc/securetty (Alpine 3.19 already has ttyGS0).
-		grep -q "ttyGS0" /etc/securetty || echo "ttyGS0" >>/etc/securetty
-		/sbin/getty -L 115200 /dev/ttyGS0 vt100 &
-	fi
-	exit 0
-	EOF
-chmod +x /tmp/.ALHB/headless_cleanup
-cat <<-EOF >/etc/init.d/headless_cleanup
-	#!/sbin/openrc-run
-
-	# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
-	# SPDX-License-Identifier: MIT
-
-	description="Headless cleanup script"
-	name="Headless cleanup"
-
-	command="/tmp/.ALHB/headless_cleanup"
-	command_background=true
-	pidfile="/run/headless_cleanup.pid"
-	EOF
-chmod +x /etc/init.d/headless_cleanup
-
-if install -m755 ${ovlpath}/unattended.sh /tmp/headless_unattended >/dev/null 2>&1; then
-	cat <<-EOF >/etc/init.d/headless_unattended
-		#!/sbin/openrc-run
-
-		# SPDX-FileCopyrightText: Copyright 2022-2025, macmpi
-		# SPDX-License-Identifier: MIT
-
-		description="Headless unattended setup script (optional)"
-		name="Headless unattended"
-
-		command="/tmp/headless_unattended"
-		command_background=true
-		pidfile="/run/headless_unattended.pid"
-		EOF
-	chmod +x /etc/init.d/headless_unattended
-fi
-
-# force service dependency tree update
-rc-update --update
-}
-
 _setup_sshd() {
 ## Setup temporary SSH server (root login, no password):
 # we use some bundled (or optionaly provided) keys to avoid generation at startup and save time.
-_apk add openssh-server
+apk add openssh-server --virtual alhb_ssh --force-non-repository
 # Preserve sshd-session & al binaries before uninstall
 [ -d /usr/lib/ssh ] && cp -a /usr/lib/ssh /tmp/.ALHB/.
 
@@ -170,7 +76,7 @@ local keygen_stance="sshd_disable_keygen=yes"
 if install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/ >/dev/null 2>&1; then
 	# Check for empty key within injected ones: if found, generate new keys.
 	if find /etc/ssh/ -maxdepth 1 -type f -name 'ssh_host_*_key*' -empty | grep -q .; then
-		rm /etc/ssh/ssh_host_*_key*
+		rm -f /etc/ssh/ssh_host_*_key*
 		keygen_stance=""
 		_logger "Will generate new SSH keys..."
 	else
@@ -260,22 +166,6 @@ fi
 
 _setup_networking() {
 ## Setup network interfaces.
-local has_wifi wlan_lst
-_has_wifi() { return "$has_wifi"; }
-
-# workaround some brcmfmac issues with wpa_supplicant (not Pi only issue)
-# https://github.com/RPi-Distro/firmware-nonfree/commit/2788cb549a19bf2e77901c4071ef88c2ad683b7c
-if lsmod | grep -q brcmfmac; then
-	rmmod brcmfmac && modprobe brcmfmac roamoff=1 feature_disable=0x282000
-	_logger "Applied brcmfmac workaround for wpa_supplicant"
-fi
-
-wlan_lst="$( find /sys/class/net/*/phy80211 -exec \
-	sh -c 'printf %s\| "$( basename "$( dirname "$0" )" )"' {} \; 2>/dev/null )"
-wlan_lst="${wlan_lst%\|}"
-[ -n "$wlan_lst" ] && [ -f "${ovlpath}"/wpa_supplicant.conf ]
-has_wifi=$?
-
 _preserve "/etc/network/interfaces"
 if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>&1; then
 	_logger "No interfaces file supplied, building defaults..."
@@ -338,7 +228,7 @@ echo "###################################"
 
 if _has_wifi && grep -qE "$wlan_lst" /etc/network/interfaces; then
 	_logger "Configuring wifi..."
-	_apk add wpa_supplicant
+	apk add wpa_supplicant --virtual alhb_wpa --force-non-repository
 	_preserve "/etc/wpa_supplicant/wpa_supplicant.conf"
 	install -m600 "${ovlpath}"/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
 	rc-service wpa_supplicant restart
@@ -359,8 +249,8 @@ rc-service networking restart
 #############################################################################
 ## Main
 
-# Redirect stdout and errors to console as service won't show messages
-exec 1>/dev/console 2>&1
+# Redirect stdout and errors to logfile as service won't show messages
+exec 1>>/tmp/alhb 2>&1
 _logger "Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi"
 
 # Determine ovl file location.
@@ -375,23 +265,61 @@ else
 	ovl="${ovlpath}/${ovl}"
 fi
 
-## Setup USB gadget ports if any connected
-/tmp/.ALHB/xg_multi -V "$( df | grep "$ovlpath" | awk '{print $1}' )" >/dev/null 2>&1
-# Setting console to connected serial port when available
-if [ -c /dev/ttyGS0 ]; then
-	# Default serial config: xon/xoff flow control.
-	stty -F /dev/ttyGS0
-	setconsole /dev/ttyGS0
-fi
-
-_prep_cleanup
-
-# Help randomness for wpa_supplicant and sshd (urandom until 3.16).
-rc-service seedrng restart || rc-service urandom restart
-
 # Detect apkovl volume ro/rw state
 grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; is_ro=$?
 _is_ro() { return "$is_ro"; }
+
+## Determine if wlan is to be used (list interfaces, and check wpa_supplicant.conf)
+wlan_lst="$( find /sys/class/net/*/phy80211 -maxdepth 0 -exec \
+	sh -c 'printf %s\| "$( basename "$( dirname "$0" )" )"' {} \; 2>/dev/null )"
+wlan_lst="${wlan_lst%\|}"
+[ -n "$wlan_lst" ] && [ -f "${ovlpath}"/wpa_supplicant.conf ]
+has_wifi=$?
+_has_wifi() { return "$has_wifi"; }
+
+# workaround some brcmfmac issues with wpa_supplicant (not-Pi only issue)
+if [ -n "$BRCMFMAC_OPTS" ] && _has_wifi && lsmod | grep -q brcmfmac; then
+	tmp_lst="$(find /sys/class/net/*/phy80211 -maxdepth 0)"
+	# shellcheck disable=SC2086  # intended without quoting
+	rmmod brcmfmac_wcc brcmfmac && modprobe brcmfmac $BRCMFMAC_OPTS && \
+		_logger "Applied brcmfmac options for improved stability" && \
+		{ while [ "$(find /sys/class/net/*/phy80211 -maxdepth 0 2>/dev/null)" != "$tmp_lst" ]; do sleep 0.2; done; }
+fi
+
+## Setup USB gadget ports if any connected
+my_vol="$( df | grep "$ovlpath" | awk '{print $1}' )"
+/tmp/.ALHB/xg_multi -V "$my_vol" >/dev/null 2>&1
+
+# Set gadget serial port when available
+if [ -c /dev/ttyGS0 ]; then
+	# Enabling terminal login
+	# no choice than making permanent change to /etc/securetty (Alpine 3.19 already has ttyGS0).
+	grep -q "ttyGS0" /etc/securetty || echo "ttyGS0" >>/etc/securetty
+	/sbin/getty -L -w -f /tmp/.ALHB/banner 115200 /dev/ttyGS0 vt100 &
+fi
+
+if install -m755 "${ovlpath}"/unattended.sh /tmp/headless_unattended >/dev/null 2>&1; then
+	cat <<-EOF >/etc/init.d/headless_unattended
+		#!/sbin/openrc-run
+
+		# SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
+		# SPDX-License-Identifier: MIT
+
+		description="Headless unattended setup script (optional)"
+		name="Headless unattended"
+
+		command="/tmp/headless_unattended"
+		command_background=true
+		pidfile="/run/headless_unattended.pid"
+		EOF
+	chmod +x /etc/init.d/headless_unattended
+fi
+
+# force service dependency tree update
+rc-update --update
+
+# Help randomness for wpa_supplicant and sshd (urandom until 3.16).
+rc-service seedrng restart || rc-service urandom restart
 
 # Create banner file.
 warn=""
@@ -417,7 +345,36 @@ _setup_networking
 grep -q "^#NO_SSH$" /tmp/headless_unattended >/dev/null 2>&1 \
 	|| _setup_sshd
 
-_logger "Initial setup done, handing-over to clean-up"
-rc-service headless_cleanup start
+_logger "Initial setup done, cleaning-up now..."
+# let sshd settle if needed
+if command -v sshd >/dev/null 2>&1; then
+	while ! service sshd status | grep -q started; do sleep 0.1; done
+fi
+_restore "/etc/ssh/sshd_config"
+_restore "/etc/conf.d/sshd"
+apk del alhb_ssh 2>/dev/null
+
+# let wpa_supplicant settle if needed
+if command -v wpa_supplicant >/dev/null 2>&1; then
+	while ! service wpa_supplicant status | grep -q started; do sleep 0.1; done
+fi
+_restore "/etc/wpa_supplicant/wpa_supplicant.conf"
+apk del alhb_wpa 2>/dev/null
+
+_restore "/etc/network/interfaces"
+_restore "/etc/hostname"
+
+# Remove from boot service to avoid spurious openrc recalls from unattended script.
+rm -f /etc/runlevels/default/headless_bootstrap
+
+# Run unattended script if available.
+if [ -f /tmp/headless_unattended ]; then
+	_logger "Starting headless_unattended service"
+	rc-service headless_unattended start
+fi
+# clear all headless services
+rm -f /etc/init.d/headless_*
+_logger "Clean-up done, enjoy !"
+
 exit 0
 
