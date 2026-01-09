@@ -19,7 +19,7 @@ MY_HOSTNAME="alpine-sys"
 MY_DISK="mmcblk0" # WARNING: this disk dev will be erased for good -- double-check!!
 MY_BOOT="${MY_DISK}p1" # dev partition for bootfs on related disk, usually 1st partition
 MY_ROOT="${MY_DISK}p2" # dev partition for rootfs related disk, may be 3rd if swap is present
-MY_ROOT_SIZE="$((6*1024))" # rootfs partition size in MB (6GB for exemaple)
+MY_ROOT_SIZE="$((6*1024))" # rootfs partition size in MB (6GB for example)
 
 # Uncomment to redirect stdout and errors to logfile as service won't show messages
 # exec 1>>/tmp/alhb 2>&1
@@ -46,7 +46,7 @@ if [ -e "$ovlpath/wpa_supplicant.conf" ]; then
 	_logger "Wifi configured"
 fi
 
-_logger "Starting base sys disk installation"
+_logger "Starting base sys-disk installation"
 cat <<-EOF > /tmp/ANSWERFILE
 	KEYMAPOPTS=none
 	HOSTNAMEOPTS="$MY_HOSTNAME"
