@@ -102,27 +102,42 @@ cat <<-EOF1 >/tmp/setup_homeassistant.sh
 	apk update
 	apk upgrade --available
 
-	# On Pi, reclaim ~48MB more RAM for CPU (GPU minimal)
+	# Pi specific tweaks
 	if grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
+		# Reclaim ~48MB more RAM for CPU (GPU minimal)
+		# https://wiki.alpinelinux.org/wiki/Raspberry_Pi#Customize_config.txt_and_usercfg.txt
 		apk add raspberrypi-bootloader-cutdown
 		echo "gpu_mem=16" >> /boot/config.txt
+		# brcmfmac options for improved wifi stability
+		# https://wiki.alpinelinux.org/wiki/Raspberry_Pi#Wireless_drivers
+		echo "options brcmfmac roamoff=1 feature_disable=0x282000" > /etc/modprobe.d/brcmfmac.conf
+	fi
 
-		# Enable zram on PiZero2W devices (multicore CPU with only 512MB Ram)
-		# This allows to run latest 64-bit container images in particular
-		if grep -q "Raspberry Pi Zero 2 W" /proc/device-tree/model; then
-			# see https://wiki.alpinelinux.org/wiki/Zram
-			apk add zram-init
-			cat <<-EOF >/etc/conf.d/zram-init
-				# settings for 500M zram
-				load_on_start=yes
-				unload_on_stop=yes
-				num_devices=1
-				type0=swap
-				size0=512
-				algo0=zstd
-				EOF
-			rc-update add zram-init boot
-		fi
+	power2() { echo "x=l(\$1)/l(2); scale=0; 2^((x+0.5)/1)" | bc -l; } # round to nearest power of 2
+	RAM="\$(free -m | awk '/Mem:/ {print \$2}')"
+	RAM="\$(power2 \$RAM)"
+	# 64-bit devices with usable RAM up to 1Gb: enable zram
+	if [ "\$RAM" -le 1024 ] && uname -m | grep -q 64; then
+		# see https://wiki.alpinelinux.org/wiki/Zram
+		apk add zram-init
+		cat <<-EOF2 >/etc/conf.d/zram-init
+			# settings for \${RAM}M zram
+			load_on_start=yes
+			unload_on_stop=yes
+			num_devices=1
+			type0=swap
+			size0=\$RAM
+			algo0=zstd
+			EOF2
+		cat <<-EOF2 >/etc/sysctl.d/99-vm-zram-parameters.conf
+			# Optimized settings for zram
+			# https://wiki.archlinux.org/title/Zram#Optimizing_swap_on_zram
+			vm.swappiness = 180
+			vm.watermark_boost_factor = 0
+			vm.watermark_scale_factor = 125
+			vm.page-cluster = 0
+			EOF2
+		rc-update add zram-init boot
 	fi
 
 	apk add bluez
