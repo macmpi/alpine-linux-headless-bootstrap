@@ -120,8 +120,9 @@ cat <<-EOF1 >/tmp/setup_homeassistant.sh
 	if [ "\$RAM" -le 1024 ] && uname -m | grep -q 64; then
 		# see https://wiki.alpinelinux.org/wiki/Zram
 		apk add zram-init
+		RAM=\$((2*\$RAM)) # 2xRAM as with zstd compression ratio is well over 3x (~3.8)
 		cat <<-EOF2 >/etc/conf.d/zram-init
-			# settings for \${RAM}M zram
+			# settings for \$RAM MB zram
 			load_on_start=yes
 			unload_on_stop=yes
 			num_devices=1
