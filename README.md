@@ -29,7 +29,7 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 - `auto-updt` (*optional*): enable automatic `headless.apkovl.tar.gz` file update with latest from master branch. If it contains `reboot` keyword all in one line, system will reboot after succesful update (unless ssh session is active or `unattended.sh` script is available).
 
 Main execution steps are logged: `cat /var/log/messages | grep headless`.\
-For more details: `cat /tmp/alhb`.
+For more details: `cat /tmp/alhb.log`.
 
 ## Seamless USB-gadget mode:
 Devices with UDC controller (*e.g., PiZero*) can expose the following features over USB port: serial console, ethernet interface and mass-storage.

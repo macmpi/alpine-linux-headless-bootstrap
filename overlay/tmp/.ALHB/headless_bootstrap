@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.7"
+ALHB_VERSION="1.7.1"
 
 # https://github.com/RPi-Distro/firmware-nonfree/commit/e1e78b65b350c799cb7cac49713e21c79fcf993d
 BRCMFMAC_OPTS="roamoff=1 feature_disable=0x282000"
@@ -244,13 +244,11 @@ rc-service networking restart
 }
 
 
-
-
 #############################################################################
 ## Main
 
 # Redirect stdout and errors to logfile as service won't show messages
-exec 1>>/tmp/alhb 2>&1
+exec 1>>/tmp/alhb.log 2>&1
 _logger "Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi"
 
 # Determine ovl file location.
@@ -268,6 +266,20 @@ fi
 # Detect apkovl volume ro/rw state
 grep -q "${ovlpath}.*[[:space:]]ro[[:space:],]" /proc/mounts; is_ro=$?
 _is_ro() { return "$is_ro"; }
+
+# Create banner file.
+warn=""
+_is_ro && warn="(remount partition rw!)"
+cat <<-EOF >/tmp/.ALHB/banner
+
+	Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi
+
+	You may want to delete/rename .apkovl file before reboot ${warn}:
+	${ovl}
+	(can be done automatically with unattended script - see sample snippet)
+
+
+	EOF
 
 ## Determine if wlan is to be used (list interfaces, and check wpa_supplicant.conf)
 wlan_lst="$( find /sys/class/net/*/phy80211 -maxdepth 0 -exec \
@@ -320,20 +332,6 @@ rc-update --update
 
 # Help randomness for wpa_supplicant and sshd (urandom until 3.16).
 rc-service seedrng restart || rc-service urandom restart
-
-# Create banner file.
-warn=""
-_is_ro && warn="(remount partition rw!)"
-cat <<-EOF >/tmp/.ALHB/banner
-
-	Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi
-
-	You may want to delete/rename .apkovl file before reboot ${warn}:
-	${ovl}
-	(can be done automatically with unattended script - see sample snippet)
-
-
-	EOF
 
 _setup_networking
 
