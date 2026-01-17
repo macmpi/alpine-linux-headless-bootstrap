@@ -22,7 +22,7 @@ MY_ROOT="${MY_DISK}p2" # dev partition for rootfs related disk, may be 3rd if sw
 MY_ROOT_SIZE="$((6*1024))" # rootfs partition size in MB (6GB for example)
 
 # Uncomment to redirect stdout and errors to logfile as service won't show messages
-# exec 1>>/tmp/alhb 2>&1
+# exec 1>>/tmp/alhb.log 2>&1
 
 # shellcheck disable=SC2142  # known special case
 alias _logger='logger -st "${0##*/}"'

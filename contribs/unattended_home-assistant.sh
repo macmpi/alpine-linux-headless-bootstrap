@@ -33,7 +33,7 @@ NATIVE_TAILSCALE=true
 NATIVE_MQTT=true
 
 # Uncomment to redirect stdout and errors to logfile as service won't show messages
-# exec 1>>/tmp/alhb 2>&1
+# exec 1>>/tmp/alhb.log 2>&1
 
 # shellcheck disable=SC2142  # known special case
 alias _logger='logger -st "${0##*/}"'
