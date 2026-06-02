@@ -45,7 +45,7 @@ Plug USB cable into host Computer port before booting device.
 _Note:_ optionally, same USB-gadget feature may be easily enabled on final system by installing `xg_multi` Alpine [package](https://pkgs.alpinelinux.org/packages?name=xg_multi&branch=edge&repo=&arch=&origin=&flagged=&maintainer=) and service during system setup phase (refer to [`xg_multi`](https://github.com/macmpi/xg_multi/) project for details).
 
 ##
-[![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/macmpi)
+<a href='https://ko-fi.com/V7V81B2UF6' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi5.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 ## Want to tweak more ?
 This repository may be forked/cloned/downloaded.\
