@@ -28,7 +28,7 @@ Extra files may be added next to `headless.apkovl.tar.gz` to customise boostrapp
 - `opt-out` (*optional*): dummy file to opt-out internet features (connection status, version check, auto-update) and related links usage anonymous [telemetry](https://is.gd/privacy.php).
 - `auto-updt` (*optional*): enable automatic `headless.apkovl.tar.gz` file update with latest from master branch. If it contains `reboot` keyword all in one line, system will reboot after succesful update (unless ssh session is active or `unattended.sh` script is available).
 
-Main execution steps are logged: `cat /var/log/messages | grep headless`.\
+Main execution steps are logged: `grep headless /var/log/messages`.\
 For more details: `cat /tmp/alhb.log`.
 
 ## Seamless USB-gadget mode:
@@ -48,7 +48,6 @@ _Note:_ optionally, same USB-gadget feature may be easily enabled on final syste
 <a href='https://ko-fi.com/V7V81B2UF6' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi5.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 ## Want to tweak more ?
-This repository may be forked/cloned/downloaded.\
 Main script file is [`headless_bootstrap`](https://github.com/macmpi/alpine-linux-headless-bootstrap/tree/main/overlay/tmp/.ALHB/headless_bootstrap).\
 Execute `./make_ALHB.sh` to rebuild `headless.apkovl.tar.gz` after changes.\
 (requires `busybox`; check `busybox` build options if not running from Alpine or Ubuntu)
