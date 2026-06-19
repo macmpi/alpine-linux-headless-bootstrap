@@ -184,9 +184,10 @@ cat <<-EOF1 >/tmp/setup_homeassistant.sh
 		! [ "$(id -u)" -eq 0 ] && { echo "Please run with administrator privileges." >&2; exit 1; }
 
 		echo "This may be (very) long...grab a coffee (or more)!"
-		docker-compose pull && \
-			docker-compose up -d && \
-			docker image prune -af
+		echo "Stopping home-assistant to free-up RAM..."
+		docker stop homeassistant >/dev/null 2>&1
+		echo "Updating home-assistant..."
+		docker-compose pull && docker-compose up -d && docker image prune -af
 		EOF2
 	chmod +x /home/$MY_USER/update_container.sh
 	chown $MY_USER /home/$MY_USER/update_container.sh
