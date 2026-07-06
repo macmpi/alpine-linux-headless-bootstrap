@@ -34,14 +34,6 @@ else
 	ovl="${ovlpath}/${ovl}"
 fi
 
-# Setup wifi if available
-if [ -e "$ovlpath/wpa_supplicant.conf" ]; then
-	apk add wpa_supplicant
-	cp "$ovlpath/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
-	rc-update add wpa_supplicant boot
-	_logger "Wifi configured"
-fi
-
 _logger "Starting base diskless installation"
 cat <<-EOF > /tmp/ANSWERFILE
 	KEYMAPOPTS=none
@@ -71,6 +63,24 @@ cat <<-EOF > /tmp/ANSWERFILE
 	EOF
 
 SSH_CONNECTION="FAKE" setup-alpine -ef /tmp/ANSWERFILE
+
+if install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>&1; then
+	_logger "Imported interfaces file"
+fi
+
+# Setup wifi if available
+if [ -e "$ovlpath/wpa_supplicant.conf" ]; then
+	apk add wpa_supplicant
+	install -m644 "$ovlpath/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
+	rc-update add wpa_supplicant boot
+	_logger "Wifi configured with imported wpa_supplicant.conf"
+fi
+
+# Provision sshd authorized keys (host keys imported by default) if available
+if install -Dm600 "${ovlpath}"/authorized_keys /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1; then
+	_logger "Imported public key SSH for authentication."
+	chown -R "$MY_USER" /home/"$MY_USER"/.ssh
+fi
 
 ## CUSTOMIZE  following install STEPS
 _logger "Install customizations"
