@@ -35,10 +35,9 @@ apk add openssh-server --virtual alhb_ssh --force-non-repository
 # Preserve sshd-session & al binaries before uninstall
 [ -d /usr/lib/ssh ] && cp -a /usr/lib/ssh /tmp/.ALHB/.
 
-_preserve "/etc/ssh/sshd_config"
 _preserve "/etc/conf.d/sshd"
 
-cat <<-EOF >/etc/ssh/sshd_config
+cat <<-EOF >/etc/ssh/sshd_config.d/alhb.conf
 	PermitRootLogin yes
 	Banner /tmp/.ALHB/banner
 	EOF
@@ -46,7 +45,7 @@ cat <<-EOF >/etc/ssh/sshd_config
 # Client authorized_keys or no authentication.
 if install -m600 "${ovlpath}"/authorized_keys /tmp/.ALHB/authorized_keys >/dev/null 2>&1; then
 	_logger "Enabling public key SSH authentication..."
-	cat <<-EOF >>/etc/ssh/sshd_config
+	cat <<-EOF >>/etc/ssh/sshd_config.d/alhb.conf
 		AuthenticationMethods publickey
 		AuthorizedKeysFile /tmp/.ALHB/authorized_keys
 		# relax strict mode as authorized_keys are inside /tmp
@@ -54,7 +53,7 @@ if install -m600 "${ovlpath}"/authorized_keys /tmp/.ALHB/authorized_keys >/dev/n
 		EOF
 else
 	_logger "No SSH authentication."
-	cat <<-EOF >>/etc/ssh/sshd_config
+	cat <<-EOF >>/etc/ssh/sshd_config.d/alhb.conf
 		AuthenticationMethods none
 		PermitEmptyPasswords yes
 		EOF
@@ -67,7 +66,7 @@ for f in /tmp/.ALHB/ssh/sshd-*; do
 	# shellcheck disable=SC2018,SC2019
 	initial=$(echo "$name" | cut -c1 | tr 'a-z' 'A-Z')
 	final=$(echo "$name" | cut -c2-)
-	echo "Sshd${initial}${final}Path $f" >>/etc/ssh/sshd_config
+	echo "Sshd${initial}${final}Path $f" >>/etc/ssh/sshd_config.d/alhb.conf
 done
 
 # Server keys: inject optional custom keys, or generate new (might be stored),
@@ -85,7 +84,7 @@ if install -m600 "${ovlpath}"/ssh_host_*_key* /etc/ssh/ >/dev/null 2>&1; then
 	fi
 else
 	_logger "Using bundled ssh keys from RAM..."
-	cat <<-EOF >>/etc/ssh/sshd_config
+	cat <<-EOF >>/etc/ssh/sshd_config.d/alhb.conf
 		HostKey /tmp/.ALHB/ssh_host_ed25519_key
 		HostKey /tmp/.ALHB/ssh_host_rsa_key
 		EOF
@@ -348,7 +347,7 @@ _logger "Initial setup done, cleaning-up now..."
 if command -v sshd >/dev/null 2>&1; then
 	while ! service sshd status | grep -q started; do sleep 0.1; done
 fi
-_restore "/etc/ssh/sshd_config"
+rm -f /etc/ssh/sshd_config.d/alhb.conf
 _restore "/etc/conf.d/sshd"
 apk del alhb_ssh 2>/dev/null
 
