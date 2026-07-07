@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.7.1"
+ALHB_VERSION="1.8"
 
 # https://github.com/RPi-Distro/firmware-nonfree/commit/e1e78b65b350c799cb7cac49713e21c79fcf993d
 BRCMFMAC_OPTS="roamoff=1 feature_disable=0x282000"
@@ -291,8 +291,9 @@ _has_wifi() { return "$has_wifi"; }
 # workaround some brcmfmac issues with wpa_supplicant (not-Pi only issue)
 if [ -n "$BRCMFMAC_OPTS" ] && _has_wifi && lsmod | grep -q brcmfmac; then
 	tmp_lst="$(find /sys/class/net/*/phy80211 -maxdepth 0)"
+	drvs="$( lsmod | grep "^brcmfmac " | awk '{print $4}' ) brcmfmac"
 	# shellcheck disable=SC2086  # intended without quoting
-	rmmod brcmfmac_wcc brcmfmac && modprobe brcmfmac $BRCMFMAC_OPTS && \
+	rmmod $drvs && modprobe brcmfmac $BRCMFMAC_OPTS && \
 		_logger "Applied brcmfmac options for improved stability" && \
 		{ while [ "$(find /sys/class/net/*/phy80211 -maxdepth 0 2>/dev/null)" != "$tmp_lst" ]; do sleep 0.2; done; }
 fi
