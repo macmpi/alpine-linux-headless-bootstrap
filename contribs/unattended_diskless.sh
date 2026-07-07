@@ -3,9 +3,9 @@
 # SPDX-FileCopyrightText: Copyright 2025-2026, macmpi
 # SPDX-License-Identifier: MIT
 
-##  Install minimal sys-based Alpine with customizable setup script (sys-setup.sh)
+##  Install minimal diskless Alpine with customizable install STEPS on media containing headless.apkovl file.
 
-# HOW TO USE (Customize MY_xxxx values to your needs. Defaults are ok for Pi)
+# HOW TO USE (Customize MY_xxxx values and STEPS  to your needs. Defaults are ok for Pi)
 # - prepare install media (Alpine 3.23 and later) as per Alpine wiki for your target hardware
 # - add headless.apkovl.tar.gz, this file (as unattended.sh) and wpa_supplicant.conf (if wifi) onto media
 # - boot machine, and let unattended install proceed & reboot (may be observed via root ssh login)
@@ -15,11 +15,7 @@
 MY_USER="alpine" # admin account user name
 MY_PASS="enipla" # password for that user
 MY_IFACE="wlan0" # network interface to be used; may be eth0, etc...(DHCP by default)
-MY_HOSTNAME="alpine-sys"
-MY_DISK="mmcblk0" # WARNING: this disk dev will be erased for good -- double-check!!
-MY_BOOT="${MY_DISK}p1" # dev partition for bootfs on related disk, usually 1st partition
-MY_ROOT="${MY_DISK}p2" # dev partition for rootfs related disk, may be 3rd if swap is present
-MY_ROOT_SIZE="$((6*1024))" # rootfs partition size in MB (6GB for example)
+MY_HOSTNAME="alpine-diskless"
 
 # Uncomment to redirect stdout and errors to logfile as service won't show messages
 # exec 1>>/tmp/alhb.log 2>&1
@@ -38,7 +34,7 @@ else
 	ovl="${ovlpath}/${ovl}"
 fi
 
-_logger "Starting base sys-disk installation"
+_logger "Starting base diskless installation"
 cat <<-EOF > /tmp/ANSWERFILE
 	KEYMAPOPTS=none
 	HOSTNAMEOPTS="$MY_HOSTNAME"
@@ -57,9 +53,13 @@ cat <<-EOF > /tmp/ANSWERFILE
 	SSHDOPTS=openssh
 	NTPOPTS=chrony
 
-	export ERASE_DISKS=/dev/$MY_DISK
-	export ROOT_SIZE=$MY_ROOT_SIZE
-	DISKOPTS="-m sys /dev/$MY_DISK"
+	# No disk install (diskless)
+	DISKOPTS=none
+
+	# Setup storage for diskless: use media where headless overlay is located
+	LBUOPTS="$ovlpath"
+	APKCACHEOPTS="\$LBUOPTS/cache"
+
 	EOF
 
 SSH_CONNECTION="FAKE" setup-alpine -ef /tmp/ANSWERFILE
@@ -82,43 +82,16 @@ if install -Dm600 "${ovlpath}"/authorized_keys /home/"$MY_USER"/.ssh/authorized_
 	chown -R "$MY_USER" /home/"$MY_USER"/.ssh
 fi
 
-# Prep install script for destination sys-based system
-_logger "Prepare sys-setup script"
-cat <<-EOF >/tmp/sys-setup.sh
-	#!/bin/sh
+## CUSTOMIZE  following install STEPS
+_logger "Install customizations"
+echo "$MY_USER:$MY_PASS" | chpasswd
+passwd -l root
 
-	## Customize this script with desired configuration elements
+apk update
+apk upgrade --available
 
-	echo "$MY_USER:$MY_PASS" | chpasswd
-	passwd -l root
-
-	apk update
-	apk upgrade --available
-
-	EOF
-chmod +x /tmp/sys-setup.sh
-
-_logger "Mounting new system for post-installation"
-mkdir -p /mnt/boot /mnt/tmp /mnt/dev /mnt/proc /mnt/sys
-mount /dev/$MY_ROOT /mnt
-mount /dev/$MY_BOOT /mnt/boot
-mount --bind /tmp /mnt/tmp
-mount --bind /dev /mnt/dev
-mount --bind /proc /mnt/proc
-mount --bind /sys /mnt/sys
-
-_logger "Running sys-setup script on disk-based system"
-chroot /mnt /tmp/sys-setup.sh
+lbu commit -d
 sync
-
-_logger "Cleaning up mounts"
-umount /mnt/sys
-umount /mnt/proc
-umount /mnt/dev
-umount /mnt/tmp
-umount /mnt/boot
-umount /mnt
-
 _logger "Finished unattended script - rebooting system"
 reboot
 
