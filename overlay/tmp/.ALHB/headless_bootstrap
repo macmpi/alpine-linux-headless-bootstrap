@@ -5,9 +5,6 @@
 
 ALHB_VERSION="1.8"
 
-# https://github.com/RPi-Distro/firmware-nonfree/commit/e1e78b65b350c799cb7cac49713e21c79fcf993d
-BRCMFMAC_OPTS="roamoff=1 feature_disable=0x282000"
-
 _preserve() {
 # Create a back-up of element (file, folder, symlink).
 	[ -z "${1}" ] && return 1
@@ -165,6 +162,14 @@ fi
 
 _setup_networking() {
 ## Setup network interfaces.
+# Determine if wlan is to be used (list interfaces, and check wpa_supplicant.conf)
+wlan_lst="$( find /sys/class/net/*/phy80211 -maxdepth 0 -exec \
+	sh -c 'printf %s\| "$( basename "$( dirname "$0" )" )"' {} \; 2>/dev/null )"
+wlan_lst="${wlan_lst%\|}"
+[ -n "$wlan_lst" ] && [ -f "${ovlpath}"/wpa_supplicant.conf ]
+has_wifi=$?
+_has_wifi() { return "$has_wifi"; }
+
 _preserve "/etc/network/interfaces"
 if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>&1; then
 	_logger "No interfaces file supplied, building defaults..."
@@ -280,24 +285,6 @@ cat <<-EOF >/tmp/.ALHB/banner
 
 	EOF
 
-## Determine if wlan is to be used (list interfaces, and check wpa_supplicant.conf)
-wlan_lst="$( find /sys/class/net/*/phy80211 -maxdepth 0 -exec \
-	sh -c 'printf %s\| "$( basename "$( dirname "$0" )" )"' {} \; 2>/dev/null )"
-wlan_lst="${wlan_lst%\|}"
-[ -n "$wlan_lst" ] && [ -f "${ovlpath}"/wpa_supplicant.conf ]
-has_wifi=$?
-_has_wifi() { return "$has_wifi"; }
-
-# workaround some brcmfmac issues with wpa_supplicant (not-Pi only issue)
-if [ -n "$BRCMFMAC_OPTS" ] && _has_wifi && lsmod | grep -q brcmfmac; then
-	tmp_lst="$(find /sys/class/net/*/phy80211 -maxdepth 0)"
-	drvs="$( lsmod | grep "^brcmfmac " | awk '{print $4}' ) brcmfmac"
-	# shellcheck disable=SC2086  # intended without quoting
-	rmmod $drvs && modprobe brcmfmac $BRCMFMAC_OPTS && \
-		_logger "Applied brcmfmac options for improved stability" && \
-		{ while [ "$(find /sys/class/net/*/phy80211 -maxdepth 0 2>/dev/null)" != "$tmp_lst" ]; do sleep 0.2; done; }
-fi
-
 ## Setup USB gadget ports if any connected
 my_vol="$( df | grep "$ovlpath" | awk '{print $1}' )"
 /tmp/.ALHB/xg_multi -V "$my_vol" >/dev/null 2>&1
@@ -361,6 +348,9 @@ apk del alhb_wpa 2>/dev/null
 
 _restore "/etc/network/interfaces"
 _restore "/etc/hostname"
+
+# remove brcmfmac options file
+rm -f /etc/modprobe.d/alhb-brcmfmac.conf
 
 # Remove from boot service to avoid spurious openrc recalls from unattended script.
 rm -f /etc/runlevels/default/headless_bootstrap
