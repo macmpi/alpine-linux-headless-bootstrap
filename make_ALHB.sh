@@ -25,7 +25,7 @@ if [ -n "$build_path" ]; then
 	find "$build_path"/overlay/etc -type d -exec chmod 755 {} \;
 	chmod 755 "$build_path"/overlay/etc/init.d/*
 	chmod 644 "$build_path"/overlay/etc/modprobe.d/*
-	chmod 755 "$build_path"/overlay/etc/runlevels/default/*
+	chmod 755 "$build_path"/overlay/etc/runlevels/boot/*
 	chmod 777 "$build_path"/overlay/tmp
 	chmod 644 "$build_path"/overlay/tmp/ALHB_LICENSE
 	chmod 700 "$build_path"/overlay/tmp/.ALHB

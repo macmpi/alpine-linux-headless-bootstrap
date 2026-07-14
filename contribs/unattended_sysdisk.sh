@@ -77,9 +77,10 @@ if [ -e "$ovlpath/wpa_supplicant.conf" ]; then
 fi
 
 # Provision sshd authorized keys (host keys imported by default) if available
-if install -Dm600 "${ovlpath}"/authorized_keys /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1; then
-	_logger "Imported public key SSH for authentication."
-	chown -R "$MY_USER" /home/"$MY_USER"/.ssh
+if install -Dm600 /root/.ssh/authorized_keys  /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1 || 
+	install -Dm600 "${ovlpath}"/authorized_keys /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1; then
+		_logger "Imported public key SSH for authentication."
+		chown -R "$MY_USER" /home/"$MY_USER"/.ssh
 fi
 
 # Prep install script for destination sys-based system

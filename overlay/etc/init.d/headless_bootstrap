@@ -14,6 +14,6 @@ depend() {
 	use logger
     want dev-settle
     need localmount
-    before net agetty.ttyGS0
-    after bootmisc hwdrivers modules
+    before agetty.ttyGS0 net firstboot sshd
+    after bootmisc hwdrivers hostname modules seedrng sysctl syslog
 }

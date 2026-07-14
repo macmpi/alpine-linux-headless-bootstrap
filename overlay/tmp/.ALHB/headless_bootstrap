@@ -40,10 +40,12 @@ cat <<-EOF >/etc/ssh/sshd_config.d/alhb.conf
 	EOF
 
 # Client authorized_keys or no authentication.
-if install -m600 "${ovlpath}"/authorized_keys /tmp/.ALHB/authorized_keys >/dev/null 2>&1; then
+if [ -f /root/.ssh/authorized_keys ] || install -m600 "${ovlpath}"/authorized_keys /tmp/.ALHB/authorized_keys >/dev/null 2>&1; then
 	_logger "Enabling public key SSH authentication..."
 	cat <<-EOF >>/etc/ssh/sshd_config.d/alhb.conf
-		AuthenticationMethods publickey
+			AuthenticationMethods publickey
+			EOF
+	[ -f  /root/.ssh/authorized_keys ] || cat <<-EOF >>/etc/ssh/sshd_config.d/alhb.conf
 		AuthorizedKeysFile /tmp/.ALHB/authorized_keys
 		# relax strict mode as authorized_keys are inside /tmp
 		StrictModes no
@@ -255,6 +257,10 @@ rc-service networking restart
 exec 1>>/tmp/alhb.log 2>&1
 _logger "Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi"
 
+# Temporarily put default runlevel away so services do not conflict (renaming won't work)
+mv /etc/runlevels/default /tmp/.
+rm -f /tmp/default/firstboot # initially set by initramfs, will be started after we start networking
+
 # Determine ovl file location.
 # Grab used ovl filename from dmesg.
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
@@ -312,15 +318,17 @@ if install -m755 "${ovlpath}"/unattended.sh /tmp/headless_unattended >/dev/null 
 		pidfile="/run/headless_unattended.pid"
 		EOF
 	chmod +x /etc/init.d/headless_unattended
+	rc-update --update
 fi
-
-# force service dependency tree update
-rc-update --update
 
 # Help randomness for wpa_supplicant and sshd (urandom until 3.16).
 rc-service seedrng restart || rc-service urandom restart
 
 _setup_networking
+
+service firstboot start
+# let firstboot settle if needed (WARNING may block if wget does not timeout in getting keys!)
+while ! service firstboot status | grep -q started; do sleep 0.1; done
 
 # Test latest available version online.
 # Can be skipped by creating a 'opt-out'-named dummy file aside apkovl file.
@@ -352,16 +360,21 @@ _restore "/etc/hostname"
 # remove brcmfmac options file
 rm -f /etc/modprobe.d/alhb-brcmfmac.conf
 
-# Remove from boot service to avoid spurious openrc recalls from unattended script.
-rm -f /etc/runlevels/default/headless_bootstrap
+# bring back default runlevel
+mv /tmp/default /etc/runlevels/.
+
+# Remove from runlevels to avoid spurious openrc recalls from unattended script.
+rm -f /etc/runlevels/*/headless_bootstrap
 
 # Run unattended script if available.
 if [ -f /tmp/headless_unattended ]; then
 	_logger "Starting headless_unattended service"
 	rc-service headless_unattended start
 fi
+
 # clear all headless services
 rm -f /etc/init.d/headless_*
+
 _logger "Clean-up done, enjoy !"
 
 exit 0
