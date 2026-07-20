@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.8"
+ALHB_VERSION="1.9"
 
 _preserve() {
 # Create a back-up of element (file, folder, symlink).
