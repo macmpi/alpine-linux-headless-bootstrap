@@ -3,10 +3,7 @@
 # SPDX-FileCopyrightText: Copyright 2022-2026, macmpi
 # SPDX-License-Identifier: MIT
 
-ALHB_VERSION="1.8"
-
-# https://github.com/RPi-Distro/firmware-nonfree/commit/e1e78b65b350c799cb7cac49713e21c79fcf993d
-BRCMFMAC_OPTS="roamoff=1 feature_disable=0x282000"
+ALHB_VERSION="1.9"
 
 _preserve() {
 # Create a back-up of element (file, folder, symlink).
@@ -43,10 +40,12 @@ cat <<-EOF >/etc/ssh/sshd_config.d/alhb.conf
 	EOF
 
 # Client authorized_keys or no authentication.
-if install -m600 "${ovlpath}"/authorized_keys /tmp/.ALHB/authorized_keys >/dev/null 2>&1; then
+if [ -f /root/.ssh/authorized_keys ] || install -m600 "${ovlpath}"/authorized_keys /tmp/.ALHB/authorized_keys >/dev/null 2>&1; then
 	_logger "Enabling public key SSH authentication..."
 	cat <<-EOF >>/etc/ssh/sshd_config.d/alhb.conf
-		AuthenticationMethods publickey
+			AuthenticationMethods publickey
+			EOF
+	[ -f  /root/.ssh/authorized_keys ] || cat <<-EOF >>/etc/ssh/sshd_config.d/alhb.conf
 		AuthorizedKeysFile /tmp/.ALHB/authorized_keys
 		# relax strict mode as authorized_keys are inside /tmp
 		StrictModes no
@@ -165,6 +164,14 @@ fi
 
 _setup_networking() {
 ## Setup network interfaces.
+# Determine if wlan is to be used (list interfaces, and check wpa_supplicant.conf)
+wlan_lst="$( find /sys/class/net/*/phy80211 -maxdepth 0 -exec \
+	sh -c 'printf %s\| "$( basename "$( dirname "$0" )" )"' {} \; 2>/dev/null )"
+wlan_lst="${wlan_lst%\|}"
+[ -n "$wlan_lst" ] && [ -f "${ovlpath}"/wpa_supplicant.conf ]
+has_wifi=$?
+_has_wifi() { return "$has_wifi"; }
+
 _preserve "/etc/network/interfaces"
 if ! install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>&1; then
 	_logger "No interfaces file supplied, building defaults..."
@@ -250,6 +257,10 @@ rc-service networking restart
 exec 1>>/tmp/alhb.log 2>&1
 _logger "Alpine Linux headless bootstrap v$ALHB_VERSION by macmpi"
 
+# Temporarily put default runlevel away so services do not conflict (renaming won't work)
+mv /etc/runlevels/default /tmp/.
+rm -f /tmp/default/firstboot # initially set by initramfs, will be started after we start networking
+
 # Determine ovl file location.
 # Grab used ovl filename from dmesg.
 ovl="$( dmesg | grep -o 'Loading user settings from .*:' | awk '{print $5}' | sed 's/:.*$//' )"
@@ -280,24 +291,6 @@ cat <<-EOF >/tmp/.ALHB/banner
 
 	EOF
 
-## Determine if wlan is to be used (list interfaces, and check wpa_supplicant.conf)
-wlan_lst="$( find /sys/class/net/*/phy80211 -maxdepth 0 -exec \
-	sh -c 'printf %s\| "$( basename "$( dirname "$0" )" )"' {} \; 2>/dev/null )"
-wlan_lst="${wlan_lst%\|}"
-[ -n "$wlan_lst" ] && [ -f "${ovlpath}"/wpa_supplicant.conf ]
-has_wifi=$?
-_has_wifi() { return "$has_wifi"; }
-
-# workaround some brcmfmac issues with wpa_supplicant (not-Pi only issue)
-if [ -n "$BRCMFMAC_OPTS" ] && _has_wifi && lsmod | grep -q brcmfmac; then
-	tmp_lst="$(find /sys/class/net/*/phy80211 -maxdepth 0)"
-	drvs="$( lsmod | grep "^brcmfmac " | awk '{print $4}' ) brcmfmac"
-	# shellcheck disable=SC2086  # intended without quoting
-	rmmod $drvs && modprobe brcmfmac $BRCMFMAC_OPTS && \
-		_logger "Applied brcmfmac options for improved stability" && \
-		{ while [ "$(find /sys/class/net/*/phy80211 -maxdepth 0 2>/dev/null)" != "$tmp_lst" ]; do sleep 0.2; done; }
-fi
-
 ## Setup USB gadget ports if any connected
 my_vol="$( df | grep "$ovlpath" | awk '{print $1}' )"
 /tmp/.ALHB/xg_multi -V "$my_vol" >/dev/null 2>&1
@@ -325,15 +318,17 @@ if install -m755 "${ovlpath}"/unattended.sh /tmp/headless_unattended >/dev/null 
 		pidfile="/run/headless_unattended.pid"
 		EOF
 	chmod +x /etc/init.d/headless_unattended
+	rc-update --update
 fi
-
-# force service dependency tree update
-rc-update --update
 
 # Help randomness for wpa_supplicant and sshd (urandom until 3.16).
 rc-service seedrng restart || rc-service urandom restart
 
 _setup_networking
+
+service firstboot start
+# let firstboot settle if needed (WARNING may block if wget does not timeout in getting keys!)
+while ! service firstboot status | grep -q started; do sleep 0.1; done
 
 # Test latest available version online.
 # Can be skipped by creating a 'opt-out'-named dummy file aside apkovl file.
@@ -362,16 +357,24 @@ apk del alhb_wpa 2>/dev/null
 _restore "/etc/network/interfaces"
 _restore "/etc/hostname"
 
-# Remove from boot service to avoid spurious openrc recalls from unattended script.
-rm -f /etc/runlevels/default/headless_bootstrap
+# remove brcmfmac options file
+rm -f /etc/modprobe.d/alhb-brcmfmac.conf
+
+# bring back default runlevel
+mv /tmp/default /etc/runlevels/.
+
+# Remove from runlevels to avoid spurious openrc recalls from unattended script.
+rm -f /etc/runlevels/*/headless_bootstrap
 
 # Run unattended script if available.
 if [ -f /tmp/headless_unattended ]; then
 	_logger "Starting headless_unattended service"
 	rc-service headless_unattended start
 fi
+
 # clear all headless services
 rm -f /etc/init.d/headless_*
+
 _logger "Clean-up done, enjoy !"
 
 exit 0
