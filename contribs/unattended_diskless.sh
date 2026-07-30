@@ -76,7 +76,7 @@ if [ -e "$ovlpath/wpa_supplicant.conf" ]; then
 	_logger "Wifi configured with imported wpa_supplicant.conf"
 fi
 
-# Provision sshd authorized keys (host keys imported by default) if available
+# Provision sshd authorized keys if available (host keys imported by default)
 if install -Dm600 /root/.ssh/authorized_keys  /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1 || 
 	install -Dm600 "${ovlpath}"/authorized_keys /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1; then
 		_logger "Imported public key SSH for authentication."
@@ -84,10 +84,12 @@ if install -Dm600 /root/.ssh/authorized_keys  /home/"$MY_USER"/.ssh/authorized_k
 		lbu include /home/"$MY_USER"/.ssh/authorized_keys 
 fi
 
-## CUSTOMIZE  following install STEPS
-_logger "Install customizations"
 echo "$MY_USER:$MY_PASS" | chpasswd
 passwd -l root
+
+#############################################
+## Customize the script below with desired configuration elements
+_logger "Install customizations"
 
 apk update
 apk upgrade --available

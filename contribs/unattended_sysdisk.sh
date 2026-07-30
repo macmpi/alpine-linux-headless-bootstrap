@@ -38,6 +38,12 @@ else
 	ovl="${ovlpath}/${ovl}"
 fi
 
+# preserve config files for reuse
+MY_TMP="$( mktemp -d )"
+cp -a "${ovlpath}"/interfaces "$MY_TMP"/interfaces >/dev/null 2>&1
+cp -a "${ovlpath}"/wpa_supplicant.conf "$MY_TMP"/wpa_supplicant.conf >/dev/null 2>&1
+cp -a  /root/.ssh/authorized_keys "$MY_TMP"/authorized_keys >/dev/null 2>&1 || cp -a "${ovlpath}"/authorized_keys "$MY_TMP"/authorized_keys >/dev/null 2>&1
+
 _logger "Starting base sys-disk installation"
 cat <<-EOF > /tmp/ANSWERFILE
 	KEYMAPOPTS=none
@@ -64,34 +70,38 @@ cat <<-EOF > /tmp/ANSWERFILE
 
 SSH_CONNECTION="FAKE" setup-alpine -ef /tmp/ANSWERFILE
 
-if install -m644 "${ovlpath}"/interfaces /etc/network/interfaces >/dev/null 2>&1; then
-	_logger "Imported interfaces file"
-fi
-
-# Setup wifi if available
-if [ -e "$ovlpath/wpa_supplicant.conf" ]; then
-	apk add wpa_supplicant
-	install -m644 "$ovlpath/wpa_supplicant.conf" /etc/wpa_supplicant/wpa_supplicant.conf
-	rc-update add wpa_supplicant boot
-	_logger "Wifi configured with imported wpa_supplicant.conf"
-fi
-
-# Provision sshd authorized keys (host keys imported by default) if available
-if install -Dm600 /root/.ssh/authorized_keys  /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1 || 
-	install -Dm600 "${ovlpath}"/authorized_keys /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1; then
-		_logger "Imported public key SSH for authentication."
-		chown -R "$MY_USER" /home/"$MY_USER"/.ssh
-fi
-
 # Prep install script for destination sys-based system
 _logger "Prepare sys-setup script"
 cat <<-EOF >/tmp/sys-setup.sh
 	#!/bin/sh
 
-	## Customize this script with desired configuration elements
+	alias _logger='logger -st "${0##*/}"'
+
+	if install -m644 "$MY_TMP"/interfaces /etc/network/interfaces >/dev/null 2>&1; then
+		_logger "Imported interfaces file"
+	fi
+
+	# Setup wifi if available
+	if [ -e "$MY_TMP"/wpa_supplicant.conf ]; then
+		apk add wpa_supplicant
+		install -m644 "$MY_TMP"/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
+		rc-update add wpa_supplicant boot
+		_logger "Wifi configured with imported wpa_supplicant.conf"
+	fi
+
+	# Provision sshd authorized keys if available (host keys imported by default)
+	if install -Dm600 "$MY_TMP"/authorized_keys /home/"$MY_USER"/.ssh/authorized_keys >/dev/null 2>&1; then
+			_logger "Imported public key SSH for authentication."
+			chown -R "$MY_USER" /home/"$MY_USER"/.ssh
+	fi
+
+	rm -rf "$MY_TMP"
 
 	echo "$MY_USER:$MY_PASS" | chpasswd
 	passwd -l root
+
+	#############################################
+	## Customize the script below with desired configuration elements
 
 	apk update
 	apk upgrade --available
