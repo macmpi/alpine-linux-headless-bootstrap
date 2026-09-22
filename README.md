@@ -12,8 +12,8 @@ Please follow [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation
 Tools provided here can be used on any hardware platform to prepare for any install modes (diskless, data disk, system disk).
 
 Just add [**headless.apkovl.tar.gz**](https://is.gd/apkovl_master) overlay file *as-is* at the root of Alpine Linux boot media (or onto any custom side-media) and boot-up the system.\
-With default DCHP-based network interface definitions (and [SSID/pass](#extra-configuration) file if using wifi), system can then be remotely accessed with: `ssh root@<IP>`\
-(system IP address may be determined with any IP scanning tools such as `nmap`).
+With default DCHP-based network interface definitions (and [SSID/pass](#extra-configuration) file if using wifi), system can then be remotely accessed with: `ssh root@alpine-headless.local` from machines running `mdsn`/`avahi` services.\
+(or `ssh root@<IP>`, system IP address determined with some LAN scanning tools such as `nmap`).
 
 As with Alpine Linux initial bring-up, `root` account has no password initially.\
 From there, actual system install can be performed as usual with `setup-alpine` for instance (check Alpine [wiki](https://wiki.alpinelinux.org/wiki/Alpine_setup_scripts#setup-alpine) for details).
