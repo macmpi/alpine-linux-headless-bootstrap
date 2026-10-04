@@ -342,6 +342,9 @@ _logger "Initial setup done, cleaning-up now..."
 # let sshd settle if needed
 if command -v sshd >/dev/null 2>&1; then
 	while ! service sshd status | grep -q started; do sleep 0.1; done
+	/tmp/.ALHB/tiny-mdns-ann --ssh &
+else
+	/tmp/.ALHB/tiny-mdns-ann &
 fi
 rm -f /etc/ssh/sshd_config.d/alhb.conf
 _restore "/etc/conf.d/sshd"

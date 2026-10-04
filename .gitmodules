@@ -2,3 +2,6 @@
 	path = xg_multi
 	url = ../xg_multi
 	branch = main
+[submodule "tiny-mdns-announcer"]
+	path = tiny-mdns-announcer
+	url = ../tiny-mdns-announcer.git
