@@ -1,7 +1,6 @@
 [submodule "xg_multi"]
 	path = xg_multi
-	url = ../xg_multi
-	branch = main
+	url = ../xg_multi.git
 [submodule "tiny-mdns-announcer"]
 	path = tiny-mdns-announcer
 	url = ../tiny-mdns-announcer.git
