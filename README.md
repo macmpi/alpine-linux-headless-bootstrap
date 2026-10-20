@@ -42,7 +42,12 @@ Plug USB cable into host Computer port before booting device.
   - alternatively, with host Computer ECM/RNDIS interface set-up as `10.42.0.1` (sharing internet or not), one can log into device from host with: `ssh root@10.42.0.2`.
   - volume containing `headless.apkovl.tar.gz` file may be accessed/mounted from host, and config files easily edited. Make sure to unmount properly from host before shutting-down device and removing USB plug.
 
-_Note:_ optionally, same USB-gadget feature may be easily enabled on final system by installing `xg_multi` Alpine [package](https://pkgs.alpinelinux.org/packages?name=xg_multi&branch=edge&repo=&arch=&origin=&flagged=&maintainer=) and service during system setup phase (refer to [`xg_multi`](https://github.com/macmpi/xg_multi/) project for details).
+## About companion utilities:
+This tool leverages 2 companion projects which may be installed separately on final system:
+- [`xg_multi`](https://github.com/macmpi/xg_multi/) provides seamless USB-gadget features, interoperable with linux/macOS/Windows hosts.
+- [`tiny-mdns-announcer`](https://github.com/macmpi/tiny-mdns-announcer) is a lightweight mDNS / DNS-SD (Zeroconf) hostname and services announcer for BusyBox.
+
+Refer to respective projects homepage for more details: they are also available as Alpine packages for easy install and boot service setup.
 
 ##
 <a href='https://ko-fi.com/V7V81B2UF6' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi5.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
