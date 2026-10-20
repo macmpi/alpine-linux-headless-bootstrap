@@ -20,6 +20,7 @@ if [ -n "$build_path" ]; then
 	cp -a overlay "$build_path"/.
 	cp -a LICENSE "$build_path"/overlay/tmp/ALHB_LICENSE
 	cp -a xg_multi/xg_multi "$build_path"/overlay/tmp/.ALHB/.
+	cp -a tiny-mdns-announcer/tiny-mdns-ann "$build_path"/overlay/tmp/.ALHB/.
 	find "$build_path"/overlay/ -exec sh -c 'TZ=UTC touch -chm -t "$0" "$1"' "$t_stamp" {} \;
 	# setting modes and owner/groups for runtime (won't affect mtime)
 	find "$build_path"/overlay/etc -type d -exec chmod 755 {} \;
